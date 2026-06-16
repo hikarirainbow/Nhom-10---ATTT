@@ -1,0 +1,147 @@
+\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath}
+\\usepackage{amsfonts}
+\\usepackage{amssymb}
+\\usepackage{graphicx}
+\\usepackage{booktabs}
+\\usepackage{hyperref}
+\\usepackage{geometry}
+\\usepackage{titlesec}
+\\usepackage{enumitem}
+
+\\geometry{margin=1in}
+
+\\titleformat{\\section}{\\normalfont\\Large\\bfseries\\color{blue}}{\\thesection}{1em}{}
+\\titleformat{\\subsection}{\\normalfont\\large\\bfseries\\color{darkgray}}{\\thesubsection}{1em}{}
+
+\\title{\\textbf{Kế hoạch & Lộ trình Thực hiện Dự án (1 Tuần)\\\\Xây dựng IDS với Trí tuệ Nhân tạo}\\\\Nhóm 10 - Bộ môn An toàn Thông tin}
+\\author{Đại học Quốc gia TP.HCM}
+\\date{Tháng 6, Năm 2026}
+
+\\begin{document}
+
+\\maketitle
+
+\\section{Phân chia Vai trò thành viên (5 Thành viên)}
+Dự án được phân rã thành các mảng công việc chuyên biệt phù hợp với năng lực của từng thành viên:
+
+\\begin{itemize}
+    \\item \\textbf{Thành viên 1 (Nhóm trưởng / AI Engineer):}
+    \\begin{itemize}
+        \\item Chịu trách nhiệm điều phối chung, tích hợp mã nguồn của cả nhóm.
+        \\item Nghiên cứu cấu hình mô hình học máy: Random Forest và XGBoost (`src/models.py`).
+        \\item Tinh chỉnh siêu tham số (hyperparameter tuning) để đạt độ chính xác cao nhất.
+    \\end{itemize}
+    
+    \\item \\textbf{Thành viên 2 (Data Engineer / Analyst):}
+    \\begin{itemize}
+        \\item Phụ trách thu thập tập dữ liệu từ Kaggle (CICIDS2017/CSE-CIC-IDS2018).
+        \\item Thực hiện phân tích dữ liệu khám phá (EDA), trực quan hóa phân phối nhãn và tương quan thuộc tính.
+        \\item Viết mã tiền xử lý, xử lý giá trị rỗng/vô cùng và cân bằng dữ liệu (`src/preprocessing.py`).
+    \\end{itemize}
+    
+    \\item \\textbf{Thành viên 3 (Network Security Specialist):}
+    \\begin{itemize}
+        \\item Nghiên cứu các đặc trưng mạng (Network flow features).
+        \\item Thu thập tập dữ liệu kiểm thử độc lập từ nguồn ngoài (ví dụ: UNSW-NB15) để chạy kiểm thử chéo (`src/evaluate.py`).
+        \\item Cấu hình Npcap và chạy thực nghiệm sniffer trực tiếp (`src/live_sniffer.py`) để phát hiện tấn công.
+    \\end{itemize}
+    
+    \\item \\textbf{Thành viên 4 (Frontend / Dashboard Developer):}
+    \\begin{itemize}
+        \\item Thiết kế và lập trình giao diện Web bằng Streamlit (`src/dashboard.py`).
+        \\item Tích hợp biểu đồ thống kê kết quả phân tích file lưu lượng và tạo module mô phỏng log xâm nhập realtime.
+    \\end{itemize}
+    
+    \\item \\textbf{Thành viên 5 (Technical Writer / Presenter):}
+    \\begin{itemize}
+        \\item Tổng hợp tài liệu, viết báo cáo học thuật bằng LaTeX hoặc Word.
+        \\item Chuẩn bị slide thuyết trình của nhóm, căn chỉnh bố cục chuyên nghiệp.
+        \\item Tổ chức các buổi chạy thử nghiệm thuyết trình thử (mock defense) trước ngày bảo vệ.
+    \\end{itemize}
+\\end{itemize}
+
+\\newpage
+\\section{Lộ trình Thực hiện Chi tiết (Roadmap 7 Ngày)}
+Dưới đây là kế hoạch chi tiết từng ngày phục vụ buổi báo cáo sau 1 tuần:
+
+\\subsection*{Ngày 1: Thiết lập Môi trường và EDA dữ liệu}
+\\begin{itemize}
+    \\item \\textbf{Công việc:} 
+    \\begin{itemize}
+        \\item Cả nhóm chạy file `run_project.py` (Lựa chọn 1) để cài đặt đồng bộ các thư viện phụ thuộc.
+        \\item Thành viên 2 tải dataset mẫu đã làm sạch từ Kaggle và lưu vào `data/raw/`.
+        \\item Thành viên 5 dựng cấu trúc tài liệu báo cáo và slide thuyết trình.
+    \\end{itemize}
+    \\item \\textbf{Kết quả bàn giao:} Môi trường chạy thành công, có file dữ liệu thật tại máy của các thành viên.
+\\end{itemize}
+
+\\subsection*{Ngày 2: Tiền xử lý dữ liệu và Lựa chọn thuộc tính}
+\\begin{itemize}
+    \\item \\textbf{Công việc:}
+    \\begin{itemize}
+        \\item Thành viên 2 thực hiện làm sạch dữ liệu, chuẩn hóa scaler và lưu lại file `scaler.pkl`.
+        \\item Thành viên 1 viết phân tích lựa chọn 15 thuộc tính mạng cốt lõi giúp hệ thống chạy nhanh.
+        \\item Thành viên 5 cập nhật chương lý thuyết về xử lý mất cân bằng dữ liệu (Class Imbalance).
+    \\end{itemize}
+    \\item \\textbf{Kết quả bàn giao:} Hoàn thiện module `preprocessing.py` hoạt động ổn định trên tệp lớn.
+\\end{itemize}
+
+\\subsection*{Ngày 3: Huấn luyện và So sánh các thuật toán AI}
+\\begin{itemize}
+    \\item \\textbf{Công việc:}
+    \\begin{itemize}
+        \\item Thành viên 1 chạy `train.py` để huấn luyện Random Forest, XGBoost và Isolation Forest.
+        \\item Trích xuất các chỉ số Accuracy, Precision, Recall, F1-Score và vẽ Confusion Matrix của các mô hình.
+        \\item Thành viên 5 lấy các kết quả bảng biểu này để đưa vào chương kết quả nghiên cứu trong báo cáo.
+    \\end{itemize}
+    \\item \\textbf{Kết quả bàn giao:} Các tệp mô hình đã lưu `.pkl` trong thư mục `models/` sẵn sàng cho việc sử dụng.
+\\end{itemize}
+
+\\subsection*{Ngày 4: Xây dựng Dashboard giao diện Web tương tác}
+\\begin{itemize}
+    \\item \\textbf{Công việc:}
+    \\begin{itemize}
+        \\item Thành viên 4 lập trình Web UI bằng Streamlit (`dashboard.py`).
+        \\item Tích hợp tính năng upload file CSV và hiển thị biểu đồ tròn phân tích lưu lượng.
+        \\item Thành viên 1 hỗ trợ liên kết mô hình AI đã train từ Ngày 3 vào dashboard để chạy dự đoán trực tiếp trên Web.
+    \\end{itemize}
+    \\item \\textbf{Kết quả bàn giao:} Giao diện Web Streamlit khởi chạy thành công qua lệnh `streamlit run src/dashboard.py`.
+\\end{itemize}
+
+\\subsection*{Ngày 5: Thực nghiệm Kiểm thử chéo và Sniffer Realtime}
+\\begin{itemize}
+    \\item \\textbf{Công việc:}
+    \\begin{itemize}
+        \\item Thành viên 3 tải dữ liệu test từ UNSW-NB15 dạng CSV và chạy `evaluate.py` để kiểm thử độ tổng quát.
+        \\item Thành viên 3 cấu hình card mạng và chạy thử `live_sniffer.py`, thực hiện quét cổng (nmap) giả lập để kiểm tra phản hồi của hệ thống.
+        \\item Thành viên 5 chụp ảnh/quay video màn hình quá trình cảnh báo realtime làm tài liệu thuyết minh.
+    \\end{itemize}
+    \\item \\textbf{Kết quả bàn giao:} Video/Ảnh chụp demo thực tế chạy sniffer và bảng số liệu đánh giá chéo.
+\\end{itemize}
+
+\\subsection*{Ngày 6: Hoàn thiện Báo cáo khoa học và Slide thuyết trình}
+\\begin{itemize}
+    \\item \\textbf{Công việc:}
+    \\begin{itemize}
+        \\item Thành viên 5 hoàn thiện tài liệu báo cáo đầy đủ các chương (Mở đầu, Cơ sở lý thuyết, Thực nghiệm, Kết quả, Kết luận).
+        \\item Cả nhóm cùng rà soát lỗi chính tả và các phần lập luận kỹ thuật.
+        \\item Đóng gói mã nguồn sạch sẽ, loại bỏ file log rác.
+    \\end{itemize}
+    \\item \\textbf{Kết quả bàn giao:} File báo cáo dạng PDF (compile từ LaTeX) và slide PowerPoint chuyên nghiệp.
+\\end{itemize}
+
+\\subsection*{Ngày 7: Tổng duyệt Demo và Thuyết trình thử}
+\\begin{itemize}
+    \\item \\textbf{Công việc:}
+    \\begin{itemize}
+        \\item Cả nhóm tổ chức họp trực tuyến/trực tiếp chạy thử Demo Dashboard Streamlit.
+        \\item Thành viên 5 chạy slide và thuyết trình thử, các thành viên khác đặt câu hỏi phản biện giả lập.
+        \\item Nộp bài tập lớn lên hệ thống quản lý học tập.
+    \\end{itemize}
+    \\item \\textbf{Kết quả bàn giao:} Dự án hoàn thiện 100%, sẵn sàng cho buổi bảo vệ chính thức trên lớp.
+\\end{itemize}
+
+\\end{document}
