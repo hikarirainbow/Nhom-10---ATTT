@@ -2,6 +2,8 @@ import os
 import sys
 import pandas as pd
 import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
 # Reconfigure stdout to use UTF-8 on Windows console to prevent UnicodeEncodeError
@@ -72,7 +74,7 @@ def main():
         
         if y_test_binary is not None:
             print(f"Accuracy: {accuracy_score(y_test_binary, rf_preds):.4f}")
-            print(classification_report(y_test_binary, rf_preds, target_names=['Benign', 'Attack']))
+            print(classification_report(y_test_binary, rf_preds, target_names=['Benign', 'Attack'], zero_division=0))
             print_ascii_confusion_matrix(confusion_matrix(y_test_binary, rf_preds))
             
             # Vẽ biểu đồ ASCII phân phối dự đoán
@@ -102,7 +104,7 @@ def main():
         
         if y_test_binary is not None:
             print(f"Accuracy: {accuracy_score(y_test_binary, xgb_preds):.4f}")
-            print(classification_report(y_test_binary, xgb_preds, target_names=['Benign', 'Attack']))
+            print(classification_report(y_test_binary, xgb_preds, target_names=['Benign', 'Attack'], zero_division=0))
             print_ascii_confusion_matrix(confusion_matrix(y_test_binary, xgb_preds))
             
             # Vẽ biểu đồ ASCII phân phối dự đoán

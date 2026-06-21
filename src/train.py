@@ -2,6 +2,8 @@ import os
 import sys
 import pandas as pd
 import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
@@ -100,7 +102,7 @@ def main():
     comparison_results["Random Forest"] = rf_acc
     print("\n=== ĐÁNH GIÁ MÔ HÌNH RANDOM FOREST ===")
     print(f"Accuracy: {rf_acc:.4f}")
-    print(classification_report(y_test, rf_preds, target_names=['Benign', 'Attack']))
+    print(classification_report(y_test, rf_preds, target_names=['Benign', 'Attack'], zero_division=0))
     print_ascii_confusion_matrix(confusion_matrix(y_test, rf_preds))
     
     # b. XGBoost
@@ -115,7 +117,7 @@ def main():
     comparison_results["XGBoost"] = xgb_acc
     print("\n=== ĐÁNH GIÁ MÔ HÌNH XGBOOST ===")
     print(f"Accuracy: {xgb_acc:.4f}")
-    print(classification_report(y_test, xgb_preds, target_names=['Benign', 'Attack']))
+    print(classification_report(y_test, xgb_preds, target_names=['Benign', 'Attack'], zero_division=0))
     print_ascii_confusion_matrix(confusion_matrix(y_test, xgb_preds))
     
     # 5. Huấn luyện mô hình Học không giám sát (Isolation Forest)
@@ -133,7 +135,7 @@ def main():
         comparison_results["Isolation Forest (Anomaly)"] = anomaly_acc
         print("\n=== ĐÁNH GIÁ MÔ HÌNH ISOLATION FOREST (ANOMALY DETECTION) ===")
         print(f"Accuracy: {anomaly_acc:.4f}")
-        print(classification_report(y_test, anomaly_preds, target_names=['Benign', 'Attack']))
+        print(classification_report(y_test, anomaly_preds, target_names=['Benign', 'Attack'], zero_division=0))
         print_ascii_confusion_matrix(confusion_matrix(y_test, anomaly_preds))
     else:
         print("[!] Không đủ dữ liệu Benign để huấn luyện Isolation Forest.")
