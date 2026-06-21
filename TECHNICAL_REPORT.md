@@ -162,12 +162,8 @@ $$P(\text{Attack} | \text{Alert}) = \frac{\text{Recall} \times \theta}{\text{Rec
 
 ## 5. Đánh Giá Tổng Quát & Khuyến Nghị Vận Hành
 
-1. **Nhóm thuật toán dạng cây (Gradient Boosting, Random Forest, XGBoost):**
-   * **Đánh giá:** Hoạt động cực kỳ hoàn hảo trên dữ liệu thực với độ chính xác >99.5% và độ cân bằng Bảo mật vs Sẵn sàng tối ưu (>99%).
-   * **Vận hành:** Nên ưu tiên sử dụng các mô hình này làm bộ dò quét chính tại các chốt chặn tự động của hệ thống, giúp bảo đảm an toàn thông tin mà không làm ảnh hưởng đến tính sẵn sàng dịch vụ của khách hàng.
-2. **Các mô hình tuyến tính (SVM, Logistic Regression):**
-   * **Đánh giá:** Khả năng phát hiện DDoS gần như tuyệt đối (99.95%) nhưng lại có xu hướng chặn nhầm lượng lớn khách hàng (32%), gây gián đoạn dịch vụ nghiêm trọng nếu chạy tự động.
-   * **Vận hành:** Có thể tích hợp kiểm tra chéo (Cross-validation) bằng các mô hình tuyến tính khi phát hiện nghi ngờ cao ở lớp lọc phụ.
-3. **Mô hình Không giám sát (Isolation Forest):**
-   * **Đánh giá:** Isolation Forest đóng vai trò chốt chặn phụ độc lập để phát hiện các cuộc tấn công Zero-day mới chưa có nhãn huấn luyện trong tập dữ liệu gốc.
-   * **Vận hành:** Chạy ngầm song song để phát hiện bất thường và kích hoạt cảnh báo sớm.
+1. **Sự đánh đổi khốc liệt giữa Bảo mật và Sẵn sàng:** Thực nghiệm mù chứng minh không một mô hình đơn lẻ nào đạt hiệu năng hoàn hảo ở cả hai khía cạnh. Nhóm cây (RF, Extra Trees) ưu tiên sự sẵn sàng của khách hàng nhưng bỏ sót tấn công, còn nhóm tuyến tính/boosting (AdaBoost, SVM) ưu tiên chặn bắt nhưng gây tắc nghẽn cho khách thường.
+2. **Khuyến nghị kiến trúc IDS phân tầng (Sequential/Cascading Filtering):**
+   * **Lớp 1 (Màng lọc sơ cấp - High Recall Filter):** Sử dụng các mô hình có độ nhạy cực cao như AdaBoost (Recall 98.35%) hoặc Naive Bayes (Recall 99.76%) để đóng vai trò chốt chặn đầu tiên bắt giữ hầu như toàn bộ các cuộc tấn công. Tuyệt đối không dùng mô hình có Recall thấp ở lớp ngoài cùng (như Random Forest, Recall ~63.75%) vì nó sẽ bỏ lọt ngay 36.25% các cuộc tấn công và khóa cứng Recall toàn hệ thống ở mức trần này.
+   * **Lớp 2 (Màng lọc thứ cấp - High Precision Filter):** Các luồng bị gán nhãn tấn công/nghi ngờ bởi Lớp 1 (chứa nhiều cảnh báo giả của khách thường do TNR Lớp 1 thấp) sẽ được đẩy tiếp qua Lớp 2 sử dụng Random Forest hoặc Extra Trees (TNR > 98.6%). Lớp 2 thực hiện vai trò kiểm tra chéo, lọc sạch và loại bỏ các cảnh báo giả để giải phóng băng thông cho người dùng lành mạnh, giải quyết triệt để bài toán Base Rate Fallacy.
+   * **Lớp 3 (Anomaly Detection):** Sử dụng Isolation Forest chạy ngầm song song để nhận diện các hành vi bất thường mới (Zero-day) chưa có dữ liệu gán nhãn huấn luyện.

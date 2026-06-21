@@ -438,10 +438,12 @@ def main():
     p = doc.add_paragraph()
     p.paragraph_format.line_spacing = 1.15
     p.add_run(
-        "Dựa trên kết quả thực nghiệm định lượng từ tập dữ liệu thực, chúng tôi đề xuất kiến trúc hệ thống IDS tối ưu như sau: "
-        "Không thể chỉ phụ thuộc vào một mô hình đơn lẻ. Thay vào đó, cần kết hợp cơ chế biểu quyết song song hoặc phân tầng. "
-        "Mô hình Cây quyết định hoặc Random Forest nên được sử dụng làm bộ lọc sơ cấp để loại bỏ các luồng thông thường với TNR cực cao (tránh chặn nhầm khách). "
-        "Các luồng nghi ngờ sẽ được chuyển tiếp qua bộ lọc thứ cấp (ví dụ AdaBoost hoặc SVM) để kiểm tra chéo nhằm nâng cao Recall, kết hợp với Isolation Forest chạy ngầm để phát hiện các dị thường Zero-day mới chưa được định nghĩa."
+        "Dựa trên kết quả thực nghiệm định lượng từ tập dữ liệu thực, chúng tôi đề xuất kiến trúc hệ thống IDS phân tầng (Sequential/Cascading Filtering) đúng nguyên lý dòng chảy dữ liệu như sau: "
+        "Tuyệt đối không dùng mô hình có Recall thấp ở lớp ngoài cùng (như Random Forest, Recall ~63.75%) vì nó sẽ bỏ lọt ngay 36.25% các cuộc tấn công và khóa cứng Recall toàn hệ thống ở mức trần này. "
+        "Thay vào đó, Lớp 1 (Màng lọc sơ cấp - High Recall Filter) phải sử dụng mô hình có độ nhạy cực cao như AdaBoost (Recall 98.35%) hoặc Naive Bayes (Recall 99.76%) để đóng vai trò chốt chặn đầu tiên bắt giữ hầu như toàn bộ các cuộc tấn công. "
+        "Sau đó, các luồng bị gán nhãn tấn công/nghi ngờ bởi Lớp 1 (chứa nhiều cảnh báo giả của khách thường do TNR thấp) sẽ được đẩy tiếp qua Lớp 2 (Màng lọc thứ cấp - High Precision Filter) sử dụng Random Forest hoặc Extra Trees (TNR > 98.6%). "
+        "Lớp 2 thực hiện vai trò kiểm tra chéo, lọc sạch và loại bỏ các cảnh báo giả để giải phóng băng thông cho người dùng lành mạnh, giải quyết triệt để bài toán Base Rate Fallacy. "
+        "Song song đó, mô hình học không giám sát Isolation Forest được chạy ngầm để phát hiện các hành vi bất thường mới (Zero-day)."
     )
 
     output_path = "BAO_CAO_IDS_AI.docx"
