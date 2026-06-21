@@ -19,7 +19,25 @@ class IDSSupervisedModel:
         if self.model_type == 'rf':
             self.model = RandomForestClassifier(**config.RF_PARAMS)
         elif self.model_type == 'xgb':
-            self.model = xgb.XGBClassifier(**config.XGB_PARAMS)
+            params = config.XGB_PARAMS.copy()
+            cuda_supported = False
+            try:
+                # Thử nghiệm xem môi trường hiện tại có hỗ trợ CUDA trong XGBoost không
+                test_clf = xgb.XGBClassifier(n_estimators=1, max_depth=1, tree_method='hist', device='cuda')
+                test_clf.fit([[0]], [0])
+                cuda_supported = True
+            except Exception:
+                cuda_supported = False
+                
+            if cuda_supported:
+                params['tree_method'] = 'hist'
+                params['device'] = 'cuda'
+                print("[🚀 CUDA] Phát hiện GPU tương thích! Đã tối ưu mô hình XGBoost chạy trên CUDA.")
+            else:
+                params.pop('device', None)
+                print("[💻 CPU] Không phát hiện CUDA hoặc driver không tương thích. Chạy XGBoost bằng CPU.")
+                
+            self.model = xgb.XGBClassifier(**params)
         else:
             raise ValueError(f"Không hỗ trợ mô hình học máy: {self.model_type}")
         print(f"[+] Khởi tạo thành công mô hình: {self.model_type}")

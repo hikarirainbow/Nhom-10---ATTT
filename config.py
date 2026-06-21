@@ -13,6 +13,11 @@ for path in [DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR, MODE
     os.makedirs(path, exist_ok=True)
 
 # --- MODEL TRAINING CONFIGURATION ---
+# Tự động loại bỏ trùng lặp dữ liệu huấn luyện để tránh biased
+DROP_DUPLICATES = True
+# Tự động tối ưu giảm kiểu dữ liệu số (downsize types) để tiết kiệm RAM
+DOWNSIZE_TYPES = True
+
 # Danh sách 15 features quan trọng nhất được chọn lọc để giảm tải hiệu năng và dễ trích xuất realtime
 SELECTED_FEATURES = [
     'Flow Duration',

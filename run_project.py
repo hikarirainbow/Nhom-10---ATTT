@@ -51,7 +51,14 @@ def main():
         elif choice == '2':
             run_command("python src/train.py")
         elif choice == '3':
-            run_command("python src/evaluate.py")
+            print("\n=== KIỂM THỬ VỚI TỆP DỮ LIỆU NGOÀI (.csv) ===")
+            custom_path = input("Nhập đường dẫn tệp CSV ngoài (Nhấn Enter để dùng tệp mặc định trong data/external/): ").strip()
+            # Loại bỏ dấu ngoặc kép thừa nếu kéo thả tệp vào terminal
+            custom_path = custom_path.strip('\"\'')
+            if custom_path:
+                run_command(f'python src/evaluate.py "{custom_path}"')
+            else:
+                run_command("python src/evaluate.py")
         elif choice == '4':
             print("\n[!] Chú ý: Chạy Sniffer trực tiếp cần quyền Quản trị viên (Admin) và cài đặt Npcap.")
             confirm = input("Xác nhận chạy? (y/n): ").strip().lower()

@@ -28,22 +28,51 @@ class IDSPreprocessor:
         df = df.dropna()
         return df
 
+    def downsize_types(self, df):
+        """Tự động ép kiểu dữ liệu số về kiểu nhỏ hơn để tối ưu RAM"""
+        df = df.copy()
+        for col in df.columns:
+            col_type = df[col].dtype
+            if col_type != object and not isinstance(col_type, pd.CategoricalDtype):
+                c_min = df[col].min()
+                c_max = df[col].max()
+                if str(col_type).startswith('int'):
+                    if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
+                        df[col] = df[col].astype(np.int8)
+                    elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
+                        df[col] = df[col].astype(np.int16)
+                    elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
+                        df[col] = df[col].astype(np.int32)
+                elif str(col_type).startswith('float'):
+                    if c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
+                        df[col] = df[col].astype(np.float32)
+        return df
+
     def fit_transform(self, df, label_column='Label'):
         """Tiền xử lý toàn diện cho tập train"""
         df = self.clean_columns(df)
         df = self.handle_missing_and_inf(df)
         
+        # Xóa trùng lặp nếu bật cấu hình
+        if getattr(config, 'DROP_DUPLICATES', True):
+            initial_rows = len(df)
+            df = df.drop_duplicates().reset_index(drop=True)
+            print(f"[+] Đã loại bỏ {initial_rows - len(df)} dòng dữ liệu trùng lặp. Còn lại {len(df)} dòng.")
+        
         # Tách features và labels
         X = df[config.SELECTED_FEATURES].copy()
         y = df[label_column].copy()
         
+        # Tối ưu kiểu dữ liệu nếu bật cấu hình
+        if getattr(config, 'DOWNSIZE_TYPES', True):
+            X = self.downsize_types(X)
+            
         # Chuẩn hóa features
         X_scaled = self.scaler.fit_transform(X)
         X_scaled = pd.DataFrame(X_scaled, columns=config.SELECTED_FEATURES)
         
         # Encode nhãn (nhãn nhị phân: Benign = 0, Attack = 1 hoặc đa lớp)
-        # Ở đây thiết lập mặc định nhị phân: Benign là 0, còn lại là 1
-        y_binary = y.apply(lambda x: 0 if str(x).strip().lower() == 'benign' else 1)
+        y_binary = y.apply(lambda x: 0 if str(x).strip().lower() in ['benign', '0', 'normal'] else 1)
         
         # Lưu scaler để dùng lại cho realtime capture
         joblib.dump(self.scaler, self.scaler_path)
@@ -64,6 +93,10 @@ class IDSPreprocessor:
             else:
                 X[col] = 0.0
                 
+        # Tối ưu kiểu dữ liệu nếu bật cấu hình
+        if getattr(config, 'DOWNSIZE_TYPES', True):
+            X = self.downsize_types(X)
+            
         # Load scaler đã lưu
         if os.path.exists(self.scaler_path):
             self.scaler = joblib.load(self.scaler_path)
