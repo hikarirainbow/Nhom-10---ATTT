@@ -66,19 +66,27 @@ def get_open_source_api_metrics():
 
 def generate_ddos_flow():
     """
-    Sinh luồng DDoS (HTTP Get Flood):
-    Mô phỏng chính xác miền giá trị của cuộc tấn công trong CICIDS2017:
-    Thời lượng luồng dài, gói tin fwd cực nhỏ (GET/SYN), gói tin bwd lớn (phản hồi lỗi/trang web),
-    IAT trung bình và lớn.
+    Sinh luồng DDoS (HTTP Get Flood) có độ khó cao hơn (Thực tế hơn):
+    Pha trộn giữa DDoS Get Flood truyền thống (gói nhỏ) và DDoS nâng cao (HTTP POST Flood 
+    chứa payload lớn giả mạo) để lách qua các bộ lọc độ dài cơ bản.
     """
+    # 85% DDoS truyền thống (gói nhỏ), 15% DDoS nâng cao (gói lớn giả mạo)
+    is_advanced = np.random.rand() < 0.15
     duration = np.random.uniform(5.0, 25.0)  # 5s - 25s
-    fwd_pkts = np.random.randint(3, 6)
-    bwd_pkts = np.random.randint(2, 5)
+    fwd_pkts = np.random.randint(3, 12)
+    bwd_pkts = np.random.randint(2, 8)
     
-    # Payload fwd rất nhỏ (chỉ header kết nối / HTTP GET ngắn), bwd rất lớn (HTML error/response)
-    fwd_len_tot = np.random.uniform(20, 45)
-    bwd_len_tot = np.random.uniform(5000, 10000)
-    
+    if is_advanced:
+        # Giả lập payload giả mạo lớn để lọt qua lọc kích thước gói
+        fwd_len_tot = np.random.uniform(800, 2500)
+        bwd_len_tot = np.random.uniform(5000, 10000)
+        fwd_len_max = np.random.uniform(200, 800)
+    else:
+        # DDoS truyền thống
+        fwd_len_tot = np.random.uniform(20, 45)
+        bwd_len_tot = np.random.uniform(5000, 10000)
+        fwd_len_max = np.random.uniform(6, 20)
+        
     flow_bytes_s = (fwd_len_tot + bwd_len_tot) / duration
     flow_pkts_s = (fwd_pkts + bwd_pkts) / duration
     
@@ -92,7 +100,7 @@ def generate_ddos_flow():
         'Total Backward Packets': bwd_pkts,
         'Total Length of Fwd Packets': fwd_len_tot,
         'Total Length of Bwd Packets': bwd_len_tot,
-        'Fwd Packet Length Max': np.random.uniform(6, 20),
+        'Fwd Packet Length Max': fwd_len_max,
         'Fwd Packet Length Min': 6,
         'Fwd Packet Length Mean': fwd_len_tot / fwd_pkts,
         'Bwd Packet Length Max': np.random.uniform(3000, 6000),
@@ -107,19 +115,31 @@ def generate_ddos_flow():
 
 def generate_benign_customer_flow(base_latency, payload_size):
     """
-    Sinh luồng truy cập của khách hàng bình thường đọc thông tin thời tiết:
-    Thời gian luồng dài (5s-20s), gói tin fwd lớn (GET + headers hoàn chỉnh),
-    gói tin bwd cực lớn (nhiều phản hồi json từ API), IAT giãn cách tự nhiên.
+    Sinh luồng truy cập của khách hàng bình thường có độ khó cao hơn (Thực tế hơn):
+    Pha trộn giữa truy cập Web thông thường (payload lớn) và các kết nối điều khiển
+    (TCP Keep-Alive / Heartbeat / API Check) có kích thước siêu nhỏ chồng lấn lên miền của DDoS.
     """
-    duration = np.random.uniform(5.0, 20.0)  # 5s - 20s
-    fwd_pkts = np.random.randint(10, 25)
-    bwd_pkts = np.random.randint(10, 30)
+    # 85% truy vấn lớn, 15% gói kết nối điều khiển nhỏ
+    is_control = np.random.rand() < 0.15
+    duration = np.random.uniform(2.0, 20.0)  # 2s - 20s
     
-    # HTTP GET Request đầy đủ headers + data
-    fwd_len_tot = np.random.uniform(500, 3000)
-    # Payload phản hồi thời tiết thực tế từ Open-Meteo API
-    bwd_len_tot = payload_size * np.random.uniform(4.0, 10.0)  # Gộp nhiều request truy vấn
-    
+    if is_control:
+        # Gói tin điều khiển nhỏ (gây nhiễu, chồng lấn lên DDoS)
+        fwd_pkts = np.random.randint(2, 4)
+        bwd_pkts = np.random.randint(1, 3)
+        fwd_len_tot = np.random.uniform(20, 80)
+        bwd_len_tot = np.random.uniform(20, 80)
+        fwd_len_max = np.random.uniform(6, 40)
+        bwd_len_max = np.random.uniform(6, 40)
+    else:
+        # Khách truy cập thời tiết thông thường
+        fwd_pkts = np.random.randint(10, 25)
+        bwd_pkts = np.random.randint(10, 30)
+        fwd_len_tot = np.random.uniform(500, 3000)
+        bwd_len_tot = payload_size * np.random.uniform(4.0, 10.0)
+        fwd_len_max = np.random.uniform(100, 1500)
+        bwd_len_max = np.random.uniform(200, 1000)
+        
     flow_bytes_s = (fwd_len_tot + bwd_len_tot) / duration
     flow_pkts_s = (fwd_pkts + bwd_pkts) / duration
     
@@ -132,10 +152,10 @@ def generate_benign_customer_flow(base_latency, payload_size):
         'Total Backward Packets': bwd_pkts,
         'Total Length of Fwd Packets': fwd_len_tot,
         'Total Length of Bwd Packets': bwd_len_tot,
-        'Fwd Packet Length Max': np.random.uniform(100, 1500),
+        'Fwd Packet Length Max': fwd_len_max,
         'Fwd Packet Length Min': np.random.uniform(0, 60),
         'Fwd Packet Length Mean': fwd_len_tot / fwd_pkts,
-        'Bwd Packet Length Max': np.random.uniform(200, 1000),
+        'Bwd Packet Length Max': bwd_len_max,
         'Bwd Packet Length Min': np.random.uniform(0, 60),
         'Bwd Packet Length Mean': bwd_len_tot / bwd_pkts,
         'Flow Bytes/s': flow_bytes_s,

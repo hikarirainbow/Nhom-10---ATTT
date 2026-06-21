@@ -137,10 +137,10 @@ Dưới đây là bảng so sánh sâu về mặt toán học giữa hai mô hì
 
 | Chỉ số đánh giá | Công thức toán học | Random Forest | XGBoost | Ý nghĩa thực tế |
 | :--- | :--- | :---: | :---: | :--- |
-| **Accuracy (Độ chính xác)** | $\frac{TP + TN}{TP + TN + FP + FN}$ | 95.90% | 99.99% | Tỷ lệ dự đoán đúng trên toàn bộ tập dữ liệu. |
-| **DDoS Recall (Độ phủ)** | $\frac{TP}{TP + FN}$ | **94.88%** | **100.00%** | Khả năng chặn đứng cuộc tấn công DDoS. XGBoost chặn gần như 100%. |
-| **Benign Recall (Availability)** | $\frac{TN}{TN + FP}$ | **100.00%** | **99.96%** | Tỷ lệ chừa đường cho khách hàng hợp lệ. RF đạt tuyệt đối, XGBoost chặn nhầm 4 luồng. |
-| **DDoS Precision (Độ chuẩn xác)** | $\frac{TP}{TP + FP}$ | 100.00% | 99.99% | Trong số những luồng bị cảnh báo độc hại, bao nhiêu phần trăm là tấn công thật. |
+| **Accuracy (Độ chính xác)** | $\frac{TP + TN}{TP + TN + FP + FN}$ | 71.23% | 98.61% | Tỷ lệ dự đoán đúng trên toàn bộ tập dữ liệu. |
+| **DDoS Recall (Độ phủ)** | $\frac{TP}{TP + FN}$ | **64.04%** | **98.32%** | Khả năng chặn đứng cuộc tấn công DDoS. XGBoost đạt hiệu năng cực tốt. |
+| **Benign Recall (Availability)** | $\frac{TN}{TN + FP}$ | **100.00%** | **99.75%** | Tỷ lệ chừa đường cho khách hàng hợp lệ (Availability). |
+| **DDoS Precision (Độ chuẩn xác)** | $\frac{TP}{TP + FP}$ | 100.00% | 99.94% | Trong số những luồng bị cảnh báo độc hại, bao nhiêu phần trăm là tấn công thật. |
 
 ### 4.2. So sánh Không gian Quyết định (Decision Boundaries)
 
@@ -160,8 +160,8 @@ Dưới đây là bảng so sánh sâu về mặt toán học giữa hai mô hì
                   5.0 s            25.0 s
 ```
 
-* **Random Forest:** Tạo ra biên quyết định dạng hình hộp trực giao (Axis-aligned hyperplanes). Nó có xu hướng bảo thủ hơn đối với lớp thiểu số khi dữ liệu dịch chuyển, dẫn đến việc không chặn nhầm khách hàng nào ($FP=0$), nhưng bỏ sót một số luồng DDoS ($FN = 2049$).
-* **XGBoost:** Học các cây quyết định tuần tự dựa trên việc tối ưu hóa độ dốc (gradient descent). Biên quyết định của nó linh hoạt và mượt mà hơn (Smooth decision boundaries). XGBoost tối ưu hóa cực tốt lớp Attack, ép thiểu số lỗi xuống bằng 0 ($FN=1$ $\implies$ Recall=100%), đổi lại biên quyết định của nó lấn nhẹ sang vùng Benign (gây ra $FP=4$).
+* **Random Forest:** Tạo ra biên quyết định dạng hình hộp trực giao (Axis-aligned hyperplanes). Nó có xu hướng bảo thủ hơn đối với lớp thiểu số khi dữ liệu dịch chuyển, dẫn đến việc không chặn nhầm khách hàng nào ($FP=0$), nhưng bỏ sót rất nhiều luồng DDoS ($FN = 14,384$, chỉ đạt tỷ lệ chặn 64.04% do các gói DDoS nâng cao có dung lượng lớn lọt lưới).
+* **XGBoost:** Học các cây quyết định tuần tự dựa trên việc tối ưu hóa độ dốc (gradient descent). Biên quyết định của nó linh hoạt và mượt mà hơn (Smooth decision boundaries). XGBoost tối ưu hóa cực tốt lớp Attack, chỉ bỏ sót 672 luồng ($FN=672$ $\implies$ Recall=98.32%), đổi lại biên quyết định của nó lấn nhẹ sang vùng Benign (gây ra $FP=25$ hay chặn nhầm 25 khách).
 
 ### 4.3. Biểu đồ Phân tích Toán học Trực quan (Matplotlib rendering)
 
