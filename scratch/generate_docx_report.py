@@ -67,7 +67,7 @@ def main():
     sub_p = doc.add_paragraph()
     sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     sub_p.paragraph_format.space_after = Pt(100)
-    run_sub = sub_p.add_run("Đề tài: Tìm hiểu về xây dựng IDS với AI.\nSử dụng tập dữ liệu Kaggle để xây dựng IDS.\nThực nghiệm đánh giá Security & Availability trên tập dữ liệu capture thực tế bên ngoài.")
+    run_sub = sub_p.add_run("Đề tài: Tìm hiểu về xây dựng IDS với AI.\nSử dụng tập dữ liệu Kaggle để xây dựng IDS.\nThực nghiệm đánh giá Security & Availability trên tập dữ liệu thực tế Friday Afternoon DDoS.")
     run_sub.font.size = Pt(12)
     run_sub.font.italic = True
     run_sub.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
@@ -89,7 +89,7 @@ def main():
     p_abstract.add_run(
         "Nghiên cứu này trình bày một quy trình toàn diện nhằm tìm hiểu và xây dựng hệ thống phát hiện xâm nhập mạng (IDS) ứng dụng trí tuệ nhân tạo. "
         "Dựa trên nền tảng tập dữ liệu học máy chuẩn hóa CICIDS2017 lấy từ nguồn Kaggle, chúng tôi đã huấn luyện thành công 10 mô hình phân loại có giám sát và 1 mô hình không giám sát (Isolation Forest). "
-        "Để đánh giá tính thực tiễn và độ bền vững của mô hình trước các cuộc tấn công DDoS quy mô lớn, một môi trường thực nghiệm mô phỏng dữ liệu capture bên ngoài có độ trễ thời gian thực đã được thiết lập. "
+        "Để đánh giá tính thực tiễn và độ bền vững của mô hình trước các cuộc tấn công DDoS quy mô lớn, một thực nghiệm đánh giá hiệu năng trên tập dữ liệu thực tế Friday Afternoon DDoS đã được thiết lập. "
         "Thông qua các chỉ số Bảo mật (DDoS Block Rate) và tính Sẵn sàng dịch vụ (Customer Availability), chúng tôi tiến hành phân tích chi tiết, trực quan hóa ranh giới quyết định (Decision Boundaries) và sự biến đổi ngưỡng quyết định của từng mô hình độc lập. "
         "Kết quả nghiên cứu cung cấp cơ sở định lượng quan trọng cho việc lựa chọn và cấu hình mô hình IDS phù hợp với các kịch bản vận hành thực tế."
     )
@@ -116,7 +116,7 @@ def main():
     p_bullet1 = doc.add_paragraph(style='List Bullet')
     p_bullet1.add_run("Khảo sát, làm sạch và trích lọc 15 đặc trưng mạng cốt lõi từ bộ dữ liệu Kaggle CICIDS2017 để huấn luyện 10 bộ phân lớp học máy và 1 thuật toán phát hiện bất thường.")
     p_bullet2 = doc.add_paragraph(style='List Bullet')
-    p_bullet2.add_run("Xây dựng bộ tạo thực nghiệm ngoài capture 50,000 dòng lưu lượng, tích hợp các yếu tố gây nhiễu ngẫu nhiên và cuộc tấn công DDoS biến thể.")
+    p_bullet2.add_run("Thực nghiệm đánh giá hiệu năng quy mô lớn trên 50,000 dòng lưu lượng mạng thực tế từ tệp dữ liệu Friday Afternoon DDoS.")
     p_bullet3 = doc.add_paragraph(style='List Bullet')
     p_bullet3.add_run("Đánh giá sự cân bằng giữa khả năng ngăn chặn tấn công bảo mật và khả năng đảm bảo hoạt động liên tục (Availability) của máy chủ dịch vụ.")
 
@@ -176,27 +176,27 @@ def main():
     p_math.add_run("s(x, n) = 2^(- E(h(x)) / c(n))")
 
     # --- Chương 3 ---
-    add_custom_heading("CHƯƠNG 3: THIẾT LẬP THỰC NGHIỆM: MÔ PHỎNG DỮ LIỆU CAPTURE NGOÀI", level=1)
+    add_custom_heading("CHƯƠNG 3: THIẾT LẬP THỰC NGHIỆM: ĐÁNH GIÁ TRÊN TẬP DỮ LIỆU THỰC TẾ CICIDS2017", level=1)
     p = doc.add_paragraph()
     p.paragraph_format.line_spacing = 1.15
     p.add_run(
-        "Để thực nghiệm khả năng hoạt động thực tế, hệ thống tiến hành giả lập một đợt kiểm thử quy mô lớn gồm 50,000 luồng dữ liệu mạng độc lập capture từ bên ngoài. "
-        "Quy trình giả lập được thiết lập như sau:\n"
+        "Để thực nghiệm khả năng hoạt động thực tế trên dữ liệu thật, hệ thống tiến hành đánh giá hiệu năng quy mô lớn gồm 50,000 luồng dữ liệu mạng độc lập trích xuất từ tập dữ liệu thực tế CICIDS2017 (Friday Afternoon DDoS). "
+        "Quy trình thiết lập thực nghiệm được thực hiện như sau:\n"
     )
     
     p_list = doc.add_paragraph(style='List Bullet')
-    p_list.add_run("Độ trễ mạng nền (latency = 200ms) và dung lượng gói tin (450 bytes) được đo lường thực tế từ API Open-Meteo để mô phỏng dịch vụ Weather Portal.")
+    p_list.add_run("Dữ liệu được tải trực tiếp từ tệp Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv trong bộ dữ liệu gốc CICIDS2017.")
     p_list2 = doc.add_paragraph(style='List Bullet')
-    p_list2.add_run("40,000 luồng DDoS Attack (80%) bao gồm 85% DDoS Volume-based truyền thống và 15% DDoS HTTP POST Flood nâng cao có gói tin kích thước lớn giả mạo.")
+    p_list2.add_run("Chọn ngẫu nhiên 50,000 luồng mạng để đảm bảo tính đại diện và công bằng của tập dữ liệu kiểm thử.")
     p_list3 = doc.add_paragraph(style='List Bullet')
-    p_list3.add_run("10,000 luồng Khách hàng bình thường (20%) chứa các gói tin điều khiển keep-alive nhỏ xen lẫn gói API thời tiết lớn.")
+    p_list3.add_run("Tỷ lệ phân bố nhãn thực tế: 28,419 luồng tấn công DDoS (chiếm 56.84%) và 21,581 luồng người dùng bình thường (Benign, chiếm 43.16%).")
     p_list4 = doc.add_paragraph(style='List Bullet')
-    p_list4.add_run("Bổ sung nhiễu Gaussian ngẫu nhiên 4% trên các đặc trưng để kiểm thử khả năng xử lý nhiễu mạng của các bộ phân lớp.")
+    p_list4.add_run("Không sử dụng dữ liệu giả lập hay mô phỏng bên ngoài, giúp phản ánh chính xác 100% các đặc trưng lưu lượng mạng của cuộc tấn công DDoS LOIC/HOIC thực tế.")
 
     # --- Chương 4 ---
     add_custom_heading("CHƯƠNG 4: KẾT QUẢ THỰC NGHIỆM & PHÂN TÍCH CHI TIẾT TỪNG BIỂU ĐỒ", level=1)
     
-    add_custom_heading("4.1. Bảng số liệu tổng hợp hiệu năng thực nghiệm ngoài", level=2)
+    add_custom_heading("4.1. Bảng số liệu tổng hợp hiệu năng thực nghiệm thực tế", level=2)
     p = doc.add_paragraph()
     p.add_run("Dưới đây là bảng số liệu thống kê kết quả chạy thực nghiệm 50,000 luồng mạng đối với 10 mô hình học máy:")
 
@@ -215,16 +215,16 @@ def main():
         cell.paragraphs[0].runs[0].font.name = 'Times New Roman'
 
     data = [
-        ("XGBoost", "99.06%", "99.75%", "96.29%"),
-        ("AdaBoost", "97.25%", "96.89%", "98.67%"),
-        ("Naive Bayes", "96.30%", "99.24%", "84.52%"),
-        ("Linear SVM", "92.32%", "91.97%", "93.75%"),
-        ("Logistic Regression", "89.28%", "87.89%", "94.80%"),
-        ("Extra Trees", "87.59%", "84.50%", "99.95%"),
-        ("Random Forest", "79.49%", "74.36%", "100.00%"),
-        ("Gradient Boosting", "79.39%", "74.32%", "99.67%"),
-        ("K-Nearest Neighbors", "77.52%", "77.04%", "79.44%"),
-        ("Decision Tree", "67.62%", "74.41%", "40.49%")
+        ("Gradient Boosting", "99.68%", "99.83%", "99.49%"),
+        ("Random Forest", "99.62%", "99.83%", "99.34%"),
+        ("XGBoost", "99.56%", "99.81%", "99.24%"),
+        ("Decision Tree", "99.45%", "99.81%", "98.99%"),
+        ("K-Nearest Neighbors", "99.15%", "99.77%", "98.33%"),
+        ("AdaBoost", "99.08%", "99.88%", "98.03%"),
+        ("Extra Trees", "98.27%", "99.90%", "96.14%"),
+        ("Logistic Regression", "86.18%", "99.95%", "68.06%"),
+        ("Linear SVM", "86.17%", "99.95%", "68.03%"),
+        ("Naive Bayes", "79.35%", "99.96%", "52.21%")
     ]
 
     for i, row_data in enumerate(data):
@@ -251,12 +251,12 @@ def main():
     p = doc.add_paragraph()
     p.paragraph_format.line_spacing = 1.15
     p.add_run(
-        "Ma trận nhầm lẫn của 10 mô hình biểu thị chi tiết số lượng mẫu dự đoán chính xác và phân loại nhầm. "
-        "Có sự đối lập rõ rệt giữa hai trường phái chính: nhóm Bagging bảo thủ và nhóm Boosting nhạy bén. "
-        "Mô hình Random Forest đạt FP = 0 (tỷ lệ chặn nhầm 0.00%), đảm bảo an toàn tuyệt đối cho khách hàng nhưng lại bỏ lọt đến 10,256 luồng DDoS vào máy chủ. "
-        "Ngược lại, XGBoost chỉ bỏ lọt 99 luồng DDoS (FN = 99) trong tổng số 40,000 luồng, bảo vệ hệ thống tối đa trước nguy cơ sụt giảm hiệu năng phần cứng. "
-        "Naive Bayes có xu hướng báo động sai rất cao (FP = 1,548) làm suy giảm tính sẵn sàng khi chặn nhầm 15.48% lượng truy cập của khách hàng. "
-        "Đặc biệt, mô hình Decision Tree đơn lẻ có số mẫu dự đoán sai khổng lồ ở cả hai lớp, chứng minh cây đơn lẻ hoàn toàn bị bất ổn định trước dữ liệu nhiễu mạng."
+        "Ma trận nhầm lẫn của 10 mô hình biểu thị chi tiết số lượng mẫu dự đoán chính xác và phân loại nhầm trên tập dữ liệu thực tế. "
+        "Nhóm thuật toán dạng cây (Gradient Boosting, Random Forest, XGBoost, Decision Tree, AdaBoost) đạt số lượng mẫu phân lớp đúng cực kỳ cao. "
+        "Ví dụ, Gradient Boosting chỉ chặn nhầm 110 khách hàng (FP = 110) và chỉ bỏ sót 49 luồng DDoS (FN = 49) trên tổng số 50,000 dòng kiểm thử thực tế. "
+        "Ngược lại, các mô hình tuyến tính (Linear SVM, Logistic Regression) và Naive Bayes tuy đạt Recall rất cao (FN < 15, nghĩa là bỏ sót cực ít DDoS) nhưng lại gây ra lượng cảnh báo sai khổng lồ. "
+        "Cụ thể, Naive Bayes chặn nhầm đến 10,314 khách hàng hợp lệ (FP = 10,314), làm sụt giảm nghiêm trọng tính sẵn sàng của hệ thống mạng. "
+        "Đáng chú ý, mô hình Decision Tree đơn lẻ hoạt động rất hiệu quả trên tập dữ liệu thực tế này với độ chính xác đạt 99.45%, cho thấy tính phân tách rõ rệt của các đặc trưng DDoS gốc."
     )
 
     # Thêm Hình 2
@@ -297,11 +297,12 @@ def main():
     p = doc.add_paragraph()
     p.paragraph_format.line_spacing = 1.15
     p.add_run(
-        "Đồ thị 5x2 thể hiện rõ mối quan hệ giữa Bảo mật (Recall chặn DDoS - màu đỏ) và Sẵn sàng dịch vụ (TNR Khách hàng - màu xanh lá) khi điều chỉnh ngưỡng quyết định (Threshold từ 0.0 đến 1.0): "
-        "Với mô hình XGBoost và AdaBoost, hai đường này giao nhau rất muộn ở sát ngưỡng 0.9. Tại ngưỡng mặc định 0.5, cả hai chỉ số đều đạt trên 96%. "
-        "Với Random Forest và Extra Trees, đường TNR màu xanh lá duy trì ổn định ở mức gần 100% xuyên suốt mọi ngưỡng, trong khi đường Recall sụt giảm rất nhanh từ ngưỡng 0.4. "
-        "Điều này chứng tỏ đối với các mô hình Bagging, nếu muốn cải thiện khả năng chặn DDoS, người quản trị buộc phải hạ ngưỡng quyết định xuống mức 0.2-0.3 để tăng độ nhạy phân loại lớp độc hại. "
-        "Ngược lại, các mô hình tuyến tính như SVM và Logistic Regression có dạng chuyển tiếp dốc tuyến tính đều đặn, cho phép căn chỉnh ngưỡng linh hoạt theo nhu cầu thực tế."
+        "Đồ thị 5x2 thể hiện sự thay đổi của độ Bảo mật (DDoS Recall - đỏ) và độ Sẵn sàng (Khách TNR - xanh lá) theo ngưỡng quyết định (Threshold từ 0.0 đến 1.0): "
+        "Với các mô hình cây quyết định (Gradient Boosting, Random Forest, XGBoost, Decision Tree), hai đường này giao nhau cực kỳ trễ ở sát ngưỡng 0.95 và duy trì ở mức cao >99% tại ngưỡng mặc định 0.5. "
+        "Điều này cho phép người vận hành an tâm sử dụng ngưỡng mặc định mà không cần điều chỉnh nhiều. "
+        "Tuy nhiên, với các mô hình tuyến tính (SVM, Logistic Regression) và Naive Bayes, hai đường này giao nhau rất sớm ở khoảng ngưỡng 0.1 - 0.2. "
+        "Tại ngưỡng mặc định 0.5, TNR của chúng chỉ đạt từ 52.2% đến 68.1% (chặn nhầm 32% - 48% khách hàng). "
+        "Để bảo vệ tính sẵn sàng cho khách hàng trên các mô hình tuyến tính này, người quản trị buộc phải nâng ngưỡng quyết định lên mức >0.9, đánh đổi bằng việc giảm nhẹ tỷ lệ chặn DDoS."
     )
 
     # Thêm Hình 4
@@ -320,12 +321,11 @@ def main():
     p = doc.add_paragraph()
     p.paragraph_format.line_spacing = 1.15
     p.add_run(
-        "Biểu đồ ranh giới quyết định 2D trực quan hóa cách các mô hình phân tách không gian đặc trưng giữa Flow Duration và Fwd Packet Length Max: "
-        "Mô hình Decision Tree đơn lẻ tạo ra ranh giới dạng lưới vuông vụn vặt và đứt gãy, minh chứng rõ ràng cho hiện tượng quá khớp (overfitting) cục bộ. "
-        "Mô hình Random Forest và Extra Trees tạo ra các ranh giới bậc thang (axis-aligned) mượt mà hơn nhờ sự kết hợp biểu quyết của nhiều cây. Vùng màu đỏ (DDoS) bị thu hẹp chứng minh xu hướng ưu tiên an toàn cho lớp Benign của thuật toán này. "
-        "XGBoost và AdaBoost tạo ra biên quyết định dạng đường cong phi tuyến uốn lượn uốn quanh rất tốt các cụm dữ liệu DDoS phức tạp, giải thích tại sao chúng đạt Recall cao nhất đối với cả DDoS truyền thống và DDoS nâng cao. "
-        "Mô hình Linear SVM và Logistic Regression phân tách không gian bằng một đường thẳng (siêu phẳng tuyến tính 2D), dẫn đến việc không thể xử lý tốt vùng chồng lấn phi tuyến của hai lớp và gây ra sai số cố định ở cả hai phía biên. "
-        "KNN tạo ra các vùng quyết định cục bộ bao quanh mật độ lân cận, trong khi Naive Bayes tạo ra biên quyết định dạng elip phản ánh giả thuyết độc lập xác suất Gaussian."
+        "Biểu đồ ranh giới quyết định 2D thể hiện sự phân hoạch không gian đặc trưng giữa Flow Duration và Fwd Packet Length Max trên tập dữ liệu thực: "
+        "Do các thuộc tính của tập dữ liệu thực tế tách biệt rất rõ ràng, các mô hình dạng cây tạo ra vùng ranh giới quyết định rất mạch lạc và vuông vắn (các đường bậc thang song song với trục). "
+        "Random Forest, Gradient Boosting và XGBoost bao bọc chặt chẽ các cụm điểm dữ liệu DDoS màu đỏ mà không xâm phạm vào vùng màu xanh của khách hàng. "
+        "Ngược lại, siêu phẳng phân chia dạng đường thẳng của SVM và Logistic Regression bị ép nghiêng quá mức, lấn sâu vào khu vực phân bố của khách hàng để cố gắng đạt Recall 99.95% cho DDoS, dẫn đến vùng nhận diện nhầm lớn. "
+        "KNN tạo ra biên phân chia rất chi tiết bao quanh các mật độ điểm lân cận, còn Naive Bayes tạo ra các đường phân mức xác suất dạng cong elip trơn, nhưng cắt quá nhiều vào vùng phân bố Benign."
     )
 
     # --- Chương 5 ---
@@ -335,34 +335,37 @@ def main():
     p = doc.add_paragraph()
     p.paragraph_format.line_spacing = 1.15
     p.add_run(
-        "Qua chuỗi thực nghiệm ngoài quy mô lớn trên 50,000 dòng dữ liệu capture ngoài, chúng tôi rút ra một số đánh giá tổng quan:\n"
+        "Qua chuỗi thực nghiệm chuyên sâu trên 50,000 dòng dữ liệu thực tế CICIDS2017, chúng tôi rút ra một số kết luận tổng quan:\n"
     )
     p_b1 = doc.add_paragraph(style='List Bullet')
-    p_b1.add_run("Nhóm thuật toán học tăng cường (XGBoost, AdaBoost) mang lại hiệu quả bảo mật tốt nhất nhờ cơ chế giảm thiểu sai số dư tuần tự, phù hợp để triển khai phòng chống DDoS.")
+    p_b1.add_run("Nhóm thuật toán dạng cây (Gradient Boosting, Random Forest, XGBoost) hoạt động cực kỳ hoàn hảo trên dữ liệu thực với độ chính xác >99.5% và độ cân bằng Bảo mật vs Sẵn sàng tối ưu (>99%).")
     p_b2 = doc.add_paragraph(style='List Bullet')
-    p_b2.add_run("Nhóm thuật toán biểu quyết rừng cây (Random Forest, Extra Trees) đảm bảo tối đa tính sẵn sàng dịch vụ (TNR ~ 100%), không gây nghẽn cổ chai hoặc gián đoạn dịch vụ của người dùng thường.")
+    p_b2.add_run("Các mô hình tuyến tính (SVM, Logistic Regression) có khả năng phát hiện DDoS gần như tuyệt đối (99.95%) nhưng lại có xu hướng chặn nhầm lượng lớn khách hàng (32%), gây gián đoạn dịch vụ nghiêm trọng nếu chạy tự động.")
     p_b3 = doc.add_paragraph(style='List Bullet')
-    p_b3.add_run("Các mô hình tuyến tính (Linear SVM, Logistic) ổn định và dễ cấu hình threshold nhưng giới hạn hiệu năng do không xử lý tốt các đặc trưng phân bố phi tuyến chồng lấn.")
-    p_b4 = doc.add_paragraph(style='List Bullet')
-    p_b4.add_run("Naive Bayes có độ nhạy cao nhưng gây báo động giả quá nhiều, không phù hợp cho môi trường thương mại trực tuyến.")
+    p_b3.add_run("Naive Bayes thể hiện nhược điểm rõ rệt khi chặn nhầm đến 47.79% khách hàng hợp lệ, không thể ứng dụng làm bộ lọc tự động đơn lẻ.")
 
     add_custom_heading("5.2. Khuyến nghị triển khai hệ thống IDS thực tế", level=2)
     p = doc.add_paragraph()
     p.paragraph_format.line_spacing = 1.15
     p.add_run(
-        "Dựa trên kết quả thực nghiệm định lượng, chúng tôi đề xuất kiến trúc hệ thống IDS tối ưu như sau: "
-        "Triển khai mô hình XGBoost ở lớp ngoài cùng của tường lửa hoặc cổng Gateway làm nhiệm vụ lọc thô luồng mạng dồn dập (DDoS Volume-based) nhờ độ chính xác 99.06% và Recall 99.75%. "
-        "Đồng thời chạy song song mô hình học không giám sát Isolation Forest ở lớp trong để theo dõi hành vi lưu lượng đi qua bộ lọc thô, giúp nhanh chóng phát hiện các cuộc tấn công Zero-day mới chưa có nhãn huấn luyện. "
-        "Ngoài ra, cần tích hợp module giám sát độ lệch phân phối (Data Drift Monitoring) liên tục thu thập đặc trưng qua sniffer mạng để phát hiện sự suy giảm hiệu năng mô hình theo thời gian và lên lịch tái huấn luyện định kỳ."
+        "Dựa trên kết quả thực nghiệm định lượng từ tập dữ liệu thực, chúng tôi đề xuất kiến trúc hệ thống IDS tối ưu như sau: "
+        "Nên ưu tiên sử dụng các mô hình học máy dạng cây như Gradient Boosting hoặc Random Forest làm bộ dò quét chính tại các chốt chặn tự động của hệ thống, giúp bảo đảm an toàn thông tin mà không làm ảnh hưởng đến tính sẵn sàng dịch vụ của khách hàng. "
+        "Song song đó, có thể tích hợp kiểm tra chéo (Cross-validation) bằng các mô hình tuyến tính khi phát hiện nghi ngờ cao. "
+        "Đồng thời, mô hình Isolation Forest cần được chạy ở luồng kiểm soát phụ để chủ động nhận diện các hành vi bất thường mới (Zero-day) chưa có dữ liệu gán nhãn trong tập huấn luyện gốc."
     )
 
     # --- Lưu tài liệu ---
     output_path = "BAO_CAO_IDS_AI.docx"
-    doc.save(output_path)
-    print(f"[+] Successfully generated Word report at: {output_path}")
+    try:
+        doc.save(output_path)
+        print(f"[+] Successfully generated Word report at: {output_path}")
+    except PermissionError:
+        output_path = "BAO_CAO_IDS_AI_v2.docx"
+        doc.save(output_path)
+        print(f"[!] BAO_CAO_IDS_AI.docx was locked. Successfully saved to fallback file: {output_path}")
 
     # Sao chép sang thư mục brain làm artifact
-    brain_path = "C:/Users/Hikari-Rainbow/.gemini/antigravity/brain/95e1186e-6a67-4ab5-8cfe-938506c0f189/BAO_CAO_IDS_AI.docx"
+    brain_path = f"C:/Users/Hikari-Rainbow/.gemini/antigravity/brain/95e1186e-6a67-4ab5-8cfe-938506c0f189/{output_path}"
     import shutil
     try:
         shutil.copy(output_path, brain_path)

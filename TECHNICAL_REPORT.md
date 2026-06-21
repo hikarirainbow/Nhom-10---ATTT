@@ -4,7 +4,7 @@
 **Nội dung thực hiện:**
 1. Khảo sát và tiền xử lý tập dữ liệu **Kaggle CICIDS2017** làm nền tảng huấn luyện IDS.
 2. Xây dựng, huấn luyện và so sánh **10 mô hình học máy phân lớp có giám sát** và **1 mô hình không giám sát (Isolation Forest)**.
-3. Thiết lập môi trường thực nghiệm ngoài: Mô phỏng lưu lượng capture thực tế quy mô lớn (50,000 dòng luồng mạng) pha trộn hành vi tinh vi để đánh giá tính sẵn sàng máy chủ (**Availability**) song song với tính bảo mật (**Security**).
+3. Thiết lập thực nghiệm trên tập dữ liệu thực tế CICIDS2017: Đánh giá hiệu năng quy mô lớn (50,000 dòng luồng mạng) để đo lường tính sẵn sàng máy chủ (**Availability**) song song với tính bảo mật (**Security**).
 4. Phân tích chi tiết, trực quan hóa ranh giới quyết định (Decision Boundaries) và đường cong đánh đổi (Threshold Trade-offs) cho từng mô hình một cách định lượng.
 
 ---
@@ -89,74 +89,65 @@ Các luồng có $s \to 1$ có độ sâu trung bình ngắn, dễ bị cô lậ
 
 ---
 
-## 3. Thiết Lập Thực Nghiệm: Mô Phỏng Capture Ngoài Quy Mô Lớn
+## 3. Thiết Lập Thực Nghiệm: Dữ Liệu Thực Tế CICIDS2017
 
-Để đáp ứng yêu cầu kiểm thử mô hình thực tế bằng nguồn dữ liệu capture bên ngoài (External Captured Data), chúng tôi đã thiết kế một module giả lập mạng nâng cao (`run_availability_test.py`) sinh ra **50,000 dòng luồng mạng** trộn lẫn giữa:
-* **80% Tấn công DDoS (40,000 dòng):** Bao gồm 85% DDoS truyền thống (gói nhỏ dồn dập, Fwd Packet Length Max từ 6 - 20 bytes) và 15% DDoS nâng cao (HTTP POST Flood giả lập payload lớn, Fwd Packet Length Max từ 800 - 2500 bytes nhằm vượt qua bộ lọc độ dài thô).
-* **20% Khách hàng Hợp lệ (10,000 dòng):** Bao gồm 85% kết nối Weather API thông thường (Fwd Packet Length Max từ 100 - 1500 bytes) lấy dữ liệu thời gian thực từ Open-Meteo API và 15% kết nối Keep-Alive/Ping điều khiển dung lượng cực nhỏ (chồng lấn lên dải phân phối của DDoS thô).
-* **Nhiễu Gaussian mạng thực tế:** Tích hợp 4% biến động ngẫu nhiên trên toàn bộ các cột đặc trưng để tạo ra độ nhiễu và thử thách độ bền vững (robustness) của mô hình.
+Để đáp ứng yêu cầu thực nghiệm ngoài trên tập dữ liệu thực tế, hệ thống tiến hành tải trực tiếp tệp ghi lưu lượng thực tế **Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv** từ thư mục `data/raw/` của bộ dữ liệu CICIDS2017 gốc.
+* **Quy mô mẫu đánh giá:** Rút ngẫu nhiên **50,000 luồng mạng** độc lập từ file CSV thô (dung lượng 77MB) để thực nghiệm kiểm thử.
+* **Phân phối nhãn thực tế:**
+  - **Tấn công DDoS (DDoS Attack):** 28,419 luồng (56.84%)
+  - **Lưu lượng hợp lệ (Benign):** 21,581 luồng (43.16%)
+* **Đặc tính dữ liệu:** Dữ liệu chứa các cuộc tấn công DDoS thực tế dạng LOIC/HOIC cùng các luồng truy cập thật của người dùng mạng, không sử dụng dữ liệu giả lập.
 
 ---
 
 ## 4. Phân Tích Thực Nghiệm Chi Tiết Qua Từng Biểu Đồ
 
-Kết quả thực nghiệm của 10 mô hình giám sát trên tập dữ liệu capture ngoài 50,000 dòng được thống kê định lượng dưới bảng sau:
+Kết quả thực nghiệm của 10 mô hình giám sát trên tập dữ liệu thực tế 50,000 dòng được thống kê định lượng dưới bảng sau:
 
 | Mô hình | Accuracy (Chính xác) | DDoS Recall (Bảo mật) | Khách Sẵn sàng (Availability) |
 | :--- | :---: | :---: | :---: |
-| **XGBoost** | **99.06%** | **99.75%** | 96.29% |
-| **AdaBoost** | **97.25%** | 96.89% | 98.67% |
-| **Naive Bayes** | 96.30% | 99.24% | 84.52% |
-| **Linear SVM** | 92.32% | 91.97% | 93.75% |
-| **Logistic Regression** | 89.28% | 87.89% | 94.80% |
-| **Extra Trees** | 87.59% | 84.50% | **99.95%** |
-| **Random Forest** | 79.49% | 74.36% | **100.00%** |
-| **Gradient Boosting** | 79.39% | 74.32% | **99.67%** |
-| **K-Nearest Neighbors**| 77.52% | 77.04% | 79.44% |
-| **Decision Tree** | 67.62% | 74.41% | 40.49% |
+| **Gradient Boosting** | **99.68%** | **99.83%** | 99.49% |
+| **Random Forest** | **99.62%** | **99.83%** | 99.34% |
+| **XGBoost** | **99.56%** | **99.81%** | 99.24% |
+| **Decision Tree** | 99.45% | 99.81% | 98.99% |
+| **K-Nearest Neighbors**| 99.15% | 99.77% | 98.33% |
+| **AdaBoost** | 99.08% | 99.88% | 98.03% |
+| **Extra Trees** | 98.27% | 99.90% | 96.14% |
+| **Logistic Regression** | 86.18% | 99.95% | 68.06% |
+| **Linear SVM** | 86.17% | 99.95% | 68.03% |
+| **Naive Bayes** | 79.35% | 99.96% | 52.21% |
 
 Dưới đây là phân tích chi tiết từng biểu đồ thu được từ thực nghiệm:
 
 ### 4.1. Phân tích Hình 1: Lưới Ma Trận Nhầm Lẫn (confusion_matrices.png)
-Biểu đồ 5x2 chứa 10 heatmaps thể hiện chính xác số lượng mẫu phân loại đúng/sai (True/False Positive/Negative) của từng mô hình:
-* **Random Forest & Extra Trees:** Đạt số lượng báo động giả bằng 0 ($FP = 0$ đối với Random Forest và $FP = 5$ đối với Extra Trees). Điều này đảm bảo tính sẵn sàng tuyệt đối cho khách hàng nhưng lại bỏ lọt đến hơn $10,000$ luồng DDoS ($FN \approx 10,256$).
-* **XGBoost & AdaBoost:** Giảm thiểu tối đa lỗi bỏ sót DDoS ($FN = 99$ đối với XGBoost và $FN = 1,244$ đối với AdaBoost), ngăn chặn hiệu quả việc làm sập tài nguyên máy chủ.
-* **Naive Bayes:** Mặc dù có độ chính xác tương đối cao, nhưng mô hình này gây ra báo động sai cực kỳ nhiều ($FP = 1,548$, tức chặn nhầm 15.48% khách hàng hợp lệ).
-* **Decision Tree:** Đạt kết quả kém nhất với số lượng phân lớp sai khổng lồ ($FP = 5,951$, tức chặn nhầm hơn 59% khách hàng bình thường), thể hiện sự quá khớp của một cây quyết định đơn lẻ.
+Biểu đồ 5x2 chứa 10 heatmaps thể hiện chính xác số lượng mẫu phân loại đúng/sai (True/False Positive/Negative) của từng mô hình trên dữ liệu thực tế:
+* **Nhóm mô hình cây phân lớp (GB, RF, XGB, DT, Ada, ET):** Đạt tỷ lệ phân loại cực kỳ chính xác. Ví dụ, Gradient Boosting chỉ chặn nhầm 110 khách hàng (FP = 110) và chỉ bỏ sót 49 luồng DDoS (FN = 49) trên tổng số 50,000 dòng kiểm thử thực tế.
+* **Nhóm mô hình Tuyến tính (Logistic, SVM) & Naive Bayes:** Đạt Recall rất cao (FN < 15, nghĩa là bỏ sót cực ít DDoS) nhưng lại gây ra lượng cảnh báo sai khổng lồ. Naive Bayes chặn nhầm đến 10,314 khách hàng hợp lệ (FP = 10,314), làm sụt giảm nghiêm trọng tính sẵn sàng của hệ thống mạng (TNR chỉ đạt 52.21%).
+* **Decision Tree đơn lẻ:** Đạt kết quả xuất sắc (TNR 98.99%, Recall 99.81%), cho thấy tính phân tách rõ ràng của các đặc trưng DDoS LOIC gốc trong CICIDS2017.
 
 ### 4.2. Phân tích Hình 2: So sánh Đường cong ROC và Precision-Recall (availability_comparison.png)
-Biểu đồ so sánh trực tiếp hiệu năng phân lớp tổng quát:
-* **Đường cong ROC:** Các mô hình **XGBoost**, **AdaBoost** và **Naive Bayes** áp sát góc trên bên trái với chỉ số AUC lần lượt đạt $0.998$, $0.995$ và $0.988$. Điều này chứng minh các mô hình này có khả năng phân biệt lớp tấn công tốt nhất. Ngược lại, **Decision Tree** đơn lẻ có đường cong ROC tiệm cận đường chéo ngẫu nhiên ($AUC \approx 0.67$), thể hiện hiệu năng phân biệt kém.
-* **Đường cong Precision-Recall:** Trong điều kiện mất cân bằng dữ liệu của capture ngoài (80% tấn công, 20% khách), đường cong PR của **XGBoost** và **AdaBoost** duy trì ở mức cao gần $1.0$ trên hầu hết dải Recall. Điều này khẳng định khi chúng cảnh báo DDoS, độ tin cậy đạt gần $100\%$, không làm ảnh hưởng đến tài nguyên máy chủ.
+* **Đường cong ROC:** Các mô hình dạng cây quyết định và lân cận (Gradient Boosting, Random Forest, XGBoost, KNN, AdaBoost) đều có đường cong ROC áp sát góc trên bên trái với AUC đạt mức lý tưởng từ 0.992 đến 0.999.
+* **Đường cong Precision-Recall:** Thể hiện rõ sự suy giảm độ tin cậy của nhóm tuyến tính và Naive Bayes. Precision của Naive Bayes sụt giảm mạnh từ giai đoạn đầu, phản ánh tỷ lệ báo động giả (False Alarms) cực lớn, gây quá tải cho bộ phận quản trị mạng nếu đưa vào vận hành thực tế.
 
 ### 4.3. Phân tích Hình 3: Lưới Đồ Thị Ngưỡng Quyết Định (tradeoff_curves.png)
-Đồ thị 5x2 mô tả sự thay đổi của Recall chặn DDoS (đỏ) và TNR Khách hàng (xanh lá) theo ngưỡng quyết định (Threshold từ 0.0 đến 1.0):
-* **XGBoost & AdaBoost:** Hai đường Recall và TNR giao nhau rất muộn (ở ngưỡng threshold $\approx 0.85$ - $0.90$). Tại ngưỡng mặc định $0.5$, cả hai chỉ số đều đạt mức tối ưu (>96%). Người quản trị có thể điều chỉnh threshold lên mức $0.8$ để đạt được $98.5\%$ Customer Availability trong khi vẫn duy trì được $97\%$ DDoS Block Rate.
-* **Random Forest & Extra Trees:** Đường TNR (xanh lá) nằm ngang tiệm cận mức $100\%$ xuyên suốt mọi ngưỡng threshold từ 0.1 đến 0.9. Ngược lại, đường Recall chặn DDoS (đỏ) sụt giảm rất dốc từ ngưỡng $0.4$. Điều này phản ánh tính bảo thủ cao của mô hình Bagging: mô hình ưu tiên bảo vệ khách hàng trước, chấp nhận bỏ lọt DDoS nếu không có bằng chứng cực kỳ rõ ràng.
-* **Logistic Regression & Linear SVM:** Hai đường giao nhau ở ngưỡng cân bằng $\approx 0.5$ với cả hai chỉ số đều nằm trong khoảng $88\% - 94\%$. Ranh giới quyết định tuyến tính khiến mô hình có độ nhạy threshold rất đều đặn (dạng đường thẳng tuyến tính).
+* **Các mô hình cây quyết định (GB, RF, XGB, DT):** Hai đường Recall (đỏ) và TNR (xanh lá) giao nhau cực kỳ trễ ở sát ngưỡng 0.95 và duy trì ở mức cao >99% tại ngưỡng mặc định 0.5. Người vận hành có thể an tâm sử dụng ngưỡng mặc định 0.5.
+* **Các mô hình tuyến tính (SVM, Logistic) & Naive Bayes:** Hai đường này giao nhau rất sớm ở khoảng ngưỡng 0.1 - 0.2. Tại ngưỡng mặc định 0.5, TNR của chúng chỉ đạt từ 52.2% đến 68.1% (chặn nhầm 32% - 48% khách hàng). Để bảo vệ tính sẵn sàng cho khách hàng trên các mô hình tuyến tính này, người quản trị buộc phải nâng ngưỡng quyết định lên mức >0.9.
 
 ### 4.4. Phân tích Hình 4: Ranh Giới Quyết Định 2D (decision_boundaries.png)
-Hình ảnh 5x2 trực quan hóa cách các mô hình phân chia không gian đặc trưng giữa `Flow Duration` (trục hoành - giây) và `Fwd Packet Length Max` (trục tung - bytes):
-* **Cây Quyết định đơn lẻ (Decision Tree):** Tạo ra các phân vùng ô cờ vuông vức, đứt gãy và chắp vá. Điều này thể hiện rõ hiện tượng quá khớp (overfitting) cục bộ vào các điểm dữ liệu nhiễu.
-* **Random Forest & Extra Trees:** Các ranh giới quyết định dạng bậc thang song song với các trục tọa độ (axis-aligned hyperplanes). Do biểu quyết trung bình của nhiều cây, các biên này mượt mà hơn Decision Tree nhưng vẫn mang hình khối góc cạnh rõ rệt. Vùng đỏ (tấn công) bị thu hẹp đáng kể về phía góc dưới, giải thích lý do tại sao chúng bỏ sót các cuộc tấn công DDoS có gói tin lớn.
-* **XGBoost & AdaBoost:** Tạo ra các vùng quyết định phi tuyến uốn lượn mềm mại bao phủ cực tốt các cụm dữ liệu DDoS màu đỏ. Sự kết hợp của nhiều cây yếu tuần tự giúp mô hình tạo ra ranh giới quyết định linh hoạt nhất, bao bọc chuẩn xác kể cả các cuộc tấn công DDoS HTTP POST nâng cao (gói tin lớn).
-* **Linear SVM & Logistic Regression:** Ranh giới quyết định là một đường thẳng (siêu phẳng tuyến tính 2D) phân chia không gian làm hai nửa. Do phân phối của DDoS nâng cao và Khách hàng điều khiển bị chồng lấn phi tuyến lên nhau, đường thẳng này không thể phân tách hoàn hảo, buộc phải chấp nhận sự pha trộn sai số ở cả hai phía biên.
-* **K-Nearest Neighbors (KNN):** Ranh giới quyết định tạo thành các đảo nhỏ cô lập bao quanh các cụm điểm dữ liệu cục bộ, rất nhạy cảm với mật độ điểm lân cận.
-* **Naive Bayes:** Ranh giới quyết định có dạng đường cong elip trơn nhẵn, phản ánh các đường đồng mức xác suất của phân phối Gaussian giả định. Do giả định các biến độc lập, biên quyết định này không phản ánh tốt các tương quan chéo, dẫn đến việc cắt quá sâu vào vùng xanh của khách hàng.
+* **Các mô hình dạng cây:** Tạo ra vùng ranh giới quyết định rất mạch lạc và vuông vắn (các đường bậc thang song song với trục). Random Forest, Gradient Boosting và XGBoost bao bọc chặt chẽ các cụm điểm dữ liệu DDoS màu đỏ mà không xâm phạm vào vùng màu xanh của khách hàng.
+* **Nhóm Tuyến tính (SVM, Logistic):** Siêu phẳng phân chia dạng đường thẳng bị ép nghiêng quá mức, lấn sâu vào khu vực phân bố của khách hàng để cố gắng đạt Recall 99.95% cho DDoS, dẫn đến vùng nhận diện nhầm lớn.
+* **KNN & Naive Bayes:** KNN tạo ra biên phân chia rất chi tiết bao quanh các mật độ điểm lân cận, còn Naive Bayes tạo ra các đường phân mức xác suất dạng cong elip trơn, nhưng cắt quá nhiều vào vùng phân bố Benign.
 
 ---
 
 ## 5. Đánh Giá Tổng Quát & Khuyến Nghị Vận Hành
 
-1. **Nhóm Học tăng cường (Boosting - XGBoost, AdaBoost):**
-   * **Đánh giá:** Đạt hiệu năng toàn diện nhất. XGBoost là mô hình xuất sắc nhất với độ chính xác 99.06% và Recall chặn DDoS đạt 99.75%.
-   * **Vận hành:** Khuyên dùng làm bộ lọc lưu lượng chính (Firewall / Reverse Proxy) cho hệ thống để ngăn ngừa hoàn toàn nguy cơ sập máy chủ do DDoS dồn dập.
-2. **Nhóm Rừng cây (Bagging - Random Forest, Extra Trees):**
-   * **Đánh giá:** Bảo vệ hoàn hảo trải nghiệm khách hàng (TNR $\approx 100\%$).
-   * **Vận hành:** Thích hợp triển khai ở môi trường mạng nội bộ hoặc các dịch vụ tài chính nhạy cảm nơi việc chặn nhầm một giao dịch hợp lệ của khách hàng đem lại thiệt hại lớn hơn nhiều so với việc trễ nải phát hiện tấn công.
-3. **Nhóm Tuyến tính & Xác suất (SVM, Logistic, Naive Bayes):**
-   * **Đánh giá:** Naive Bayes học cực nhanh và nhạy bén với DDoS nhưng gây phiền toái lớn cho khách hàng. SVM và Logistic ổn định nhưng giới hạn bởi tính tuyến tính.
-   * **Vận hành:** Có thể dùng làm các bộ phân loại phụ (Secondary Check) hoặc chạy song song để tham chiếu kiểm tra chéo.
-4. **Mô hình Không giám sát (Isolation Forest):**
-   * **Đánh giá:** Mặc dù độ chính xác trên tập DDoS đã biết không cao bằng XGBoost, Isolation Forest là chốt chặn duy nhất có khả năng phát hiện các cuộc tấn công mới chưa có mẫu huấn luyện (Zero-day) nhờ cơ chế cô lập điểm dị thường.
-   * **Vận hành:** Khuyên dùng chạy ngầm song song để phát hiện bất thường và kích hoạt cảnh báo sớm cho đội ngũ quản trị hệ thống (SOC).
+1. **Nhóm thuật toán dạng cây (Gradient Boosting, Random Forest, XGBoost):**
+   * **Đánh giá:** Hoạt động cực kỳ hoàn hảo trên dữ liệu thực với độ chính xác >99.5% và độ cân bằng Bảo mật vs Sẵn sàng tối ưu (>99%).
+   * **Vận hành:** Nên ưu tiên sử dụng các mô hình này làm bộ dò quét chính tại các chốt chặn tự động của hệ thống, giúp bảo đảm an toàn thông tin mà không làm ảnh hưởng đến tính sẵn sàng dịch vụ của khách hàng.
+2. **Các mô hình tuyến tính (SVM, Logistic Regression):**
+   * **Đánh giá:** Khả năng phát hiện DDoS gần như tuyệt đối (99.95%) nhưng lại có xu hướng chặn nhầm lượng lớn khách hàng (32%), gây gián đoạn dịch vụ nghiêm trọng nếu chạy tự động.
+   * **Vận hành:** Có thể tích hợp kiểm tra chéo (Cross-validation) bằng các mô hình tuyến tính khi phát hiện nghi ngờ cao ở lớp lọc phụ.
+3. **Mô hình Không giám sát (Isolation Forest):**
+   * **Đánh giá:** Isolation Forest đóng vai trò chốt chặn phụ độc lập để phát hiện các cuộc tấn công Zero-day mới chưa có nhãn huấn luyện trong tập dữ liệu gốc.
+   * **Vận hành:** Chạy ngầm song song để phát hiện bất thường và kích hoạt cảnh báo sớm.

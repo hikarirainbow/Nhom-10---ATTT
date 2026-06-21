@@ -24,195 +24,39 @@ from src.cli_visualizer import print_ascii_confusion_matrix, print_ascii_bar_cha
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding='utf-8')
 
-def get_open_source_api_metrics():
+def load_real_ddos_dataset():
     """
-    Truy vấn API Thời tiết Open-Meteo để xác định chủ đề kiểm thử (Weather Portal),
-    đồng thời đo lường độ trễ mạng thực tế và dung lượng phản hồi (payload size).
+    Tải tập dữ liệu DDoS thực tế từ file Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv
+    trong thư mục data/raw/ để tiến hành đánh giá thực tế.
     """
-    url = "https://api.open-meteo.com/v1/forecast?latitude=21.0285&longitude=105.8542&current_weather=true"
+    raw_path = os.path.join(config.RAW_DATA_DIR, "Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv")
     print("\n" + "=" * 80)
-    print("🌐 BƯỚC 1: TRUY VẤN API MÃ NGUỒN MỞ ĐỂ XÁC ĐỊNH CHỦ ĐỀ & THIẾT LẬP THAM SỐ GỐC")
+    print("📊 BƯỚC 1 & 2: TẢI TẬP DỮ LIỆU DDoS THỰC TẾ CICIDS2017 (FRIDAY AFTERNOON)")
     print("=" * 80)
-    print(f"[*] Đang kết nối tới API: {url}...")
+    print(f"[*] Đang đọc file dữ liệu thực tế từ: {raw_path}...")
     
-    start_time = time.perf_counter()
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = response.read()
-            latency = time.perf_counter() - start_time
-            payload_size = len(data)
-            
-            # Đọc một phần dữ liệu thời tiết để xác định chủ đề
-            weather_json = json.loads(data.decode('utf-8'))
-            temp = weather_json.get("current_weather", {}).get("temperature", "N/A")
-            windspeed = weather_json.get("current_weather", {}).get("windspeed", "N/A")
-            
-            print(f"[+] Kết nối API thành công!")
-            print(f"    - Chủ đề xác định: CỔNG THÔNG TIN DỰ BÁO THỜI TIẾT QUỐC GIA (Weather Portal API)")
-            print(f"    - Nhiệt độ hiện tại tại Hà Nội: {temp}°C | Tốc độ gió: {windspeed} km/h")
-            print(f"    - Độ trễ mạng (Latency) đo được: {latency * 1000:.2f} ms")
-            print(f"    - Dung lượng gói tin phản hồi (Payload size): {payload_size} bytes")
-            return latency, payload_size, True
-    except Exception as e:
-        latency = 0.20  # Fallback 200ms
-        payload_size = 450  # Fallback 450 bytes
-        print(f"[!] Không thể kết nối tới API thời tiết (Có thể thiết bị đang ngoại tuyến): {e}")
-        print(f"[!] Chế độ Fallback được kích hoạt:")
-        print(f"    - Chủ đề mô phỏng: CỔNG THÔNG TIN DỰ BÁO THỜI TIẾT QUỐC GIA (Offline Simulator)")
-        print(f"    - Độ trễ mạng mặc định: {latency * 1000:.2f} ms")
-        print(f"    - Dung lượng phản hồi mặc định: {payload_size} bytes")
-        return latency, payload_size, False
-
-def generate_ddos_flow():
-    """
-    Sinh luồng DDoS (HTTP Get Flood) có độ khó cao hơn (Thực tế hơn):
-    Pha trộn giữa DDoS Get Flood truyền thống (gói nhỏ) và DDoS nâng cao (HTTP POST Flood 
-    chứa payload lớn giả mạo) để lách qua các bộ lọc độ dài cơ bản.
-    """
-    # 85% DDoS truyền thống (gói nhỏ), 15% DDoS nâng cao (gói lớn giả mạo)
-    is_advanced = np.random.rand() < 0.15
-    duration = np.random.uniform(5.0, 25.0)  # 5s - 25s
-    fwd_pkts = np.random.randint(3, 12)
-    bwd_pkts = np.random.randint(2, 8)
+    # Đọc tệp CSV thực tế
+    df = pd.read_csv(raw_path)
+    df.columns = df.columns.str.strip()
     
-    if is_advanced:
-        # Giả lập payload giả mạo lớn để lọt qua lọc kích thước gói
-        fwd_len_tot = np.random.uniform(800, 2500)
-        bwd_len_tot = np.random.uniform(5000, 10000)
-        fwd_len_max = np.random.uniform(200, 800)
-    else:
-        # DDoS truyền thống
-        fwd_len_tot = np.random.uniform(20, 45)
-        bwd_len_tot = np.random.uniform(5000, 10000)
-        fwd_len_max = np.random.uniform(6, 20)
+    # Xử lý missing và inf
+    df = df.replace([np.inf, -np.inf], np.nan).dropna()
+    
+    # Lấy mẫu ngẫu nhiên 50,000 dòng để cân bằng bộ nhớ và tốc độ vẽ đồ thị
+    sample_size = min(len(df), 50000)
+    df_sampled = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
+    
+    # In thông tin phân phối nhãn thực tế
+    label_counts = df_sampled['Label'].value_counts()
+    print(f"[+] Đã tải thành công {sample_size:,} dòng dữ liệu thực tế CICIDS2017.")
+    for lbl, cnt in label_counts.items():
+        print(f"    - Nhãn: {lbl:<25} | Số lượng: {cnt:,} luồng")
         
-    flow_bytes_s = (fwd_len_tot + bwd_len_tot) / duration
-    flow_pkts_s = (fwd_pkts + bwd_pkts) / duration
-    
-    # IAT
-    flow_iat_mean = (duration / (fwd_pkts + bwd_pkts - 1)) * 1e6
-    flow_iat_max = flow_iat_mean * np.random.uniform(1.5, 3.5)
-    
-    return {
-        'Flow Duration': duration * 1e6,
-        'Total Fwd Packets': fwd_pkts,
-        'Total Backward Packets': bwd_pkts,
-        'Total Length of Fwd Packets': fwd_len_tot,
-        'Total Length of Bwd Packets': bwd_len_tot,
-        'Fwd Packet Length Max': fwd_len_max,
-        'Fwd Packet Length Min': 6,
-        'Fwd Packet Length Mean': fwd_len_tot / fwd_pkts,
-        'Bwd Packet Length Max': np.random.uniform(3000, 6000),
-        'Bwd Packet Length Min': 0,
-        'Bwd Packet Length Mean': bwd_len_tot / bwd_pkts,
-        'Flow Bytes/s': flow_bytes_s,
-        'Flow Packets/s': flow_pkts_s,
-        'Flow IAT Mean': flow_iat_mean,
-        'Flow IAT Max': flow_iat_max,
-        'Label': 'DDoS-Attack'
-    }
-
-def generate_benign_customer_flow(base_latency, payload_size):
-    """
-    Sinh luồng truy cập của khách hàng bình thường có độ khó cao hơn (Thực tế hơn):
-    Pha trộn giữa truy cập Web thông thường (payload lớn) và các kết nối điều khiển
-    (TCP Keep-Alive / Heartbeat / API Check) có kích thước siêu nhỏ chồng lấn lên miền của DDoS.
-    """
-    # 85% truy vấn lớn, 15% gói kết nối điều khiển nhỏ
-    is_control = np.random.rand() < 0.15
-    duration = np.random.uniform(2.0, 20.0)  # 2s - 20s
-    
-    if is_control:
-        # Gói tin điều khiển nhỏ (gây nhiễu, chồng lấn lên DDoS)
-        fwd_pkts = np.random.randint(2, 4)
-        bwd_pkts = np.random.randint(1, 3)
-        fwd_len_tot = np.random.uniform(20, 80)
-        bwd_len_tot = np.random.uniform(20, 80)
-        fwd_len_max = np.random.uniform(6, 40)
-        bwd_len_max = np.random.uniform(6, 40)
-    else:
-        # Khách truy cập thời tiết thông thường
-        fwd_pkts = np.random.randint(10, 25)
-        bwd_pkts = np.random.randint(10, 30)
-        fwd_len_tot = np.random.uniform(500, 3000)
-        bwd_len_tot = payload_size * np.random.uniform(4.0, 10.0)
-        fwd_len_max = np.random.uniform(100, 1500)
-        bwd_len_max = np.random.uniform(200, 1000)
-        
-    flow_bytes_s = (fwd_len_tot + bwd_len_tot) / duration
-    flow_pkts_s = (fwd_pkts + bwd_pkts) / duration
-    
-    flow_iat_mean = (duration / (fwd_pkts + bwd_pkts - 1)) * 1e6
-    flow_iat_max = flow_iat_mean * np.random.uniform(2.2, 4.5)
-    
-    return {
-        'Flow Duration': duration * 1e6,
-        'Total Fwd Packets': fwd_pkts,
-        'Total Backward Packets': bwd_pkts,
-        'Total Length of Fwd Packets': fwd_len_tot,
-        'Total Length of Bwd Packets': bwd_len_tot,
-        'Fwd Packet Length Max': fwd_len_max,
-        'Fwd Packet Length Min': np.random.uniform(0, 60),
-        'Fwd Packet Length Mean': fwd_len_tot / fwd_pkts,
-        'Bwd Packet Length Max': bwd_len_max,
-        'Bwd Packet Length Min': np.random.uniform(0, 60),
-        'Bwd Packet Length Mean': bwd_len_tot / bwd_pkts,
-        'Flow Bytes/s': flow_bytes_s,
-        'Flow Packets/s': flow_pkts_s,
-        'Flow IAT Mean': flow_iat_mean,
-        'Flow IAT Max': flow_iat_max,
-        'Label': 'BENIGN'
-    }
+    return df_sampled
 
 def main():
-    # 1. Thu thập thông tin nền (latency, payload size) từ API thật
-    latency, payload_size, online = get_open_source_api_metrics()
-    
-    # 2. Sinh tập dữ liệu kiểm thử quy mô lớn
-    print("\n" + "=" * 80)
-    print("📊 BƯỚC 2: MÔ PHỎNG CHIẾN DỊCH DDoS QUY MÔ LỚN (AVAILABILITY TEST DATASET)")
-    print("=" * 80)
-    
-    total_samples = 50000
-    ddos_ratio = 0.80  # 80% DDoS, 20% Benign
-    num_ddos = int(total_samples * ddos_ratio)
-    num_benign = total_samples - num_ddos
-    
-    print(f"[*] Quy mô sinh dữ liệu: {total_samples:,} dòng luồng mạng")
-    print(f"    - Luồng DDoS Flood tấn công (Mục tiêu: Cần phát hiện chặn): {num_ddos:,} luồng")
-    print(f"    - Luồng Khách hàng hợp lệ (Mục tiêu: Phải chừa đường cho qua): {num_benign:,} luồng")
-    
-    # Trộn ngẫu nhiên nhãn trước để quá trình sinh chân thực
-    labels = ["DDoS-Attack"] * num_ddos + ["BENIGN"] * num_benign
-    np.random.shuffle(labels)
-    
-    flows = []
-    for idx, label in enumerate(labels):
-        if label == "DDoS-Attack":
-            flow = generate_ddos_flow()
-        else:
-            flow = generate_benign_customer_flow(latency, payload_size)
-        flows.append(flow)
-        
-        # Cập nhật thanh tiến trình sau mỗi 2,000 dòng
-        if (idx + 1) % 2000 == 0 or (idx + 1) == total_samples:
-            print_text_progress_bar(idx + 1, total_samples, prefix='Đang giả lập luồng dữ liệu', suffix='Hoàn thành', length=30)
-            
-    df_test = pd.DataFrame(flows)
-    
-    # Thêm nhiễu ngẫu nhiên Gaussian để giả lập tính biến động của mạng thực tế
-    noise_factor = 0.04
-    for col in df_test.columns:
-        if col != 'Label':
-            df_test[col] = df_test[col].apply(lambda x: max(x * (1 + np.random.normal(0, noise_factor)), 0.0))
-            
-    # Lưu tập dữ liệu kiểm thử quy mô lớn
-    output_path = os.path.join(config.EXTERNAL_DATA_DIR, "large_ddos_availability_test.csv")
-    df_test.to_csv(output_path, index=False)
-    print(f"\n[+] Đã ghi tập dữ liệu kiểm thử thành công vào: {output_path}")
-    
-    # 3. Tiền xử lý dữ liệu kiểm thử
+    # Tải tập dữ liệu thực tế CICIDS2017
+    df_test = load_real_ddos_dataset()
     print("\n" + "=" * 80)
     print("⚙️  BƯỚC 3: TIỀN XỬ LÝ DỮ LIỆU & TRÍCH XUẤT ĐẶC TRƯNG")
     print("=" * 80)
@@ -485,18 +329,7 @@ def main():
     print("[+] Báo cáo phân tích kỹ thuật chi tiết đã được lưu tại: TECHNICAL_REPORT.md ở thư mục gốc.")
     print("[+] Các biểu đồ trực quan đã được lưu tại thư mục: data/external/")
     
-    try:
-        # Prompt hỏi người dùng mở báo cáo và hình ảnh trực tiếp
-        confirm = input("\n👉 Bạn có muốn tự động mở báo cáo (TECHNICAL_REPORT.md) và các biểu đồ ảnh vừa vẽ không? (y/n): ").strip().lower()
-        if confirm in ['y', 'yes']:
-            print("[*] Đang mở tệp báo cáo và biểu đồ ảnh...")
-            os.system("start TECHNICAL_REPORT.md")
-            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "confusion_matrices.png")}"')
-            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "availability_comparison.png")}"')
-            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "tradeoff_curves.png")}"')
-            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "decision_boundaries.png")}"')
-    except Exception as e:
-        print(f"[!] Không thể tự động mở tệp: {e}")
+    print("[*] Kết thúc quy trình đánh giá.")
 
 if __name__ == "__main__":
     main()
