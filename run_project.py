@@ -25,7 +25,8 @@ def print_menu():
     print(" [4] Chạy sniffer mạng trực tiếp trên Máy tính (live_sniffer.py)")
     print(" [5] Khởi chạy Giao diện Dashboard Trực quan (Streamlit)")
     print(" [6] Đọc Tài liệu Hướng dẫn (README.md)")
-    print(" [7] Thoát")
+    print(" [7] Mô phỏng & Đánh giá Tính Sẵn sàng Máy chủ (DDoS vs Khách) (run_availability_test.py)")
+    print(" [8] Thoát")
     print("========================================================================")
 
 def run_command(command):
@@ -44,7 +45,7 @@ def main():
         clear_screen()
         print_banner()
         print_menu()
-        choice = input("Nhập lựa chọn của bạn (1-7): ").strip()
+        choice = input("Nhập lựa chọn của bạn (1-8): ").strip()
         
         if choice == '1':
             run_command("pip install -r requirements.txt")
@@ -78,6 +79,8 @@ def main():
                 print("[!] File README.md không tồn tại.")
                 input("\nNhấn Enter để quay lại...")
         elif choice == '7':
+            run_command("python src/run_availability_test.py")
+        elif choice == '8':
             print("\nCảm ơn bạn đã sử dụng chương trình. Tạm biệt!")
             break
         else:
