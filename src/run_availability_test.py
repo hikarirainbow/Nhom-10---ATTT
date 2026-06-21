@@ -8,6 +8,11 @@ import pandas as pd
 import warnings
 warnings.filterwarnings('ignore')
 
+import matplotlib
+matplotlib.use('Agg')  # Chạy headless, chỉ ghi file không mở cửa sổ GUI
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 # Đảm bảo import được config và src từ thư mục gốc
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
@@ -215,14 +220,21 @@ def main():
         'XGBoost': IDSSupervisedModel(model_type='xgb')
     }
     
+    model_probs = {}
+    model_cms = {}
+    
     for name, model in models.items():
         try:
             model.load()
             preds = model.predict(X_test_scaled)
+            probs = model.predict_proba(X_test_scaled)
+            
+            model_probs[name] = probs
             
             # Tính toán ma trận nhầm lẫn
             from sklearn.metrics import confusion_matrix
             cm = confusion_matrix(y_true_binary, preds)
+            model_cms[name] = cm
             tn, fp, fn, tp = cm.ravel()
             
             # Tính toán các chỉ số an ninh và vận hành
@@ -263,6 +275,113 @@ def main():
             
         except FileNotFoundError:
             print(f"[!] Bỏ qua đánh giá {name}: Không tìm thấy file mô hình đã huấn luyện.")
+            
+    # 5. Vẽ biểu đồ chất lượng bằng Matplotlib & Seaborn
+    print("\n" + "=" * 80)
+    print("📈 BƯỚC 5: TẠO CÁC BIỂU ĐỒ PHÂN TÍCH TOÁN HỌC PHỨC TẠP BẰNG MATPLOTLIB")
+    print("=" * 80)
+    
+    # 5.1 Vẽ biểu đồ Confusion Matrices Heatmap
+    if model_cms:
+        fig, axes = plt.subplots(1, len(model_cms), figsize=(12, 5))
+        if len(model_cms) == 1:
+            axes = [axes]
+        for idx, (name, cm) in enumerate(model_cms.items()):
+            sns.heatmap(cm, annot=True, fmt=',d', cmap='Blues', cbar=False, ax=axes[idx],
+                        xticklabels=['Benign (Khách)', 'Attack (DDoS)'],
+                        yticklabels=['Benign (Khách)', 'Attack (DDoS)'])
+            axes[idx].set_title(f'Ma trận Nhầm lẫn: {name}')
+            axes[idx].set_ylabel('Thực tế (Actual)')
+            axes[idx].set_xlabel('Dự đoán (Predicted)')
+        plt.tight_layout()
+        cm_path = os.path.join(config.EXTERNAL_DATA_DIR, "confusion_matrices.png")
+        plt.savefig(cm_path, dpi=300)
+        plt.close()
+        print(f"[+] Đã lưu biểu đồ Ma trận Nhầm lẫn tại: {cm_path}")
+        
+    # 5.2 Vẽ biểu đồ Availability & Security Curves (ROC, PR, Threshold, 2D Feature Space)
+    if model_probs:
+        from sklearn.metrics import roc_curve, auc, precision_recall_curve
+        fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+        
+        # Subplot 1: ROC Curve
+        for name, probs in model_probs.items():
+            fpr, tpr, _ = roc_curve(y_true_binary, probs)
+            roc_auc = auc(fpr, tpr)
+            axes[0, 0].plot(fpr, tpr, lw=2, label=f'{name} (AUC = {roc_auc:.4f})')
+        axes[0, 0].plot([0, 1], [0, 1], color='gray', linestyle='--')
+        axes[0, 0].set_xlim([0.0, 1.0])
+        axes[0, 0].set_ylim([0.0, 1.05])
+        axes[0, 0].set_xlabel('Tỷ lệ chặn nhầm khách hàng (False Positive Rate)')
+        axes[0, 0].set_ylabel('Tỷ lệ chặn DDoS thành công (True Positive Rate)')
+        axes[0, 0].set_title('Đường cong ROC')
+        axes[0, 0].legend(loc="lower right")
+        axes[0, 0].grid(True, linestyle=':', alpha=0.6)
+        
+        # Subplot 2: Precision-Recall Curve
+        for name, probs in model_probs.items():
+            prec, rec, _ = precision_recall_curve(y_true_binary, probs)
+            axes[0, 1].plot(rec, prec, lw=2, label=f'{name}')
+        axes[0, 1].set_xlim([0.0, 1.0])
+        axes[0, 1].set_ylim([0.0, 1.05])
+        axes[0, 1].set_xlabel('Tỷ lệ chặn DDoS thành công (Recall)')
+        axes[0, 1].set_ylabel('Độ chuẩn xác chặn DDoS (Precision)')
+        axes[0, 1].set_title('Đường cong Precision-Recall')
+        axes[0, 1].legend(loc="lower left")
+        axes[0, 1].grid(True, linestyle=':', alpha=0.6)
+        
+        # Subplot 3: Trade-off giữa Security (DDoS Block) và Availability (Customer Allowed) theo Threshold (XGBoost)
+        if 'XGBoost' in model_probs:
+            xgb_p = model_probs['XGBoost']
+            thresholds = np.linspace(0, 1, 100)
+            block_rates = []
+            availabilities = []
+            for t in thresholds:
+                preds_t = (xgb_p >= t).astype(int)
+                cm_t = confusion_matrix(y_true_binary, preds_t)
+                tn_t, fp_t, fn_t, tp_t = cm_t.ravel()
+                block_rates.append(tp_t / (tp_t + fn_t) * 100 if (tp_t + fn_t) > 0 else 0)
+                availabilities.append(tn_t / (tn_t + fp_t) * 100 if (tn_t + fp_t) > 0 else 0)
+            axes[1, 0].plot(thresholds, block_rates, 'r-', lw=2, label='Chặn DDoS (DDoS Block Rate)')
+            axes[1, 0].plot(thresholds, availabilities, 'g-', lw=2, label='Tính sẵn sàng cho Khách (Availability)')
+            axes[1, 0].axvline(0.5, color='blue', linestyle=':', label='Ngưỡng Mặc định (0.5)')
+            axes[1, 0].set_xlabel('Ngưỡng ra quyết định (Decision Threshold)')
+            axes[1, 0].set_ylabel('Tỷ lệ phần trăm (%)')
+            axes[1, 0].set_title('Bảo mật vs Tính Sẵn sàng (XGBoost)')
+            axes[1, 0].legend(loc="lower center")
+            axes[1, 0].grid(True, linestyle=':', alpha=0.6)
+        else:
+            axes[1, 0].text(0.5, 0.5, 'Cần nạp mô hình XGBoost để vẽ', ha='center', va='center')
+            
+        # Subplot 4: Phân tán 2D các Đặc trưng và Ranh giới Quyết định (Decision Space)
+        benign_indices = (y_true_binary == 0)
+        ddos_indices = (y_true_binary == 1)
+        
+        # Tránh lỗi chọn mẫu nếu số lượng quá nhỏ
+        size_b = min(500, sum(benign_indices))
+        size_d = min(500, sum(ddos_indices))
+        
+        idx_b = np.random.choice(np.where(benign_indices)[0], size=size_b, replace=False) if size_b > 0 else []
+        idx_d = np.random.choice(np.where(ddos_indices)[0], size=size_d, replace=False) if size_d > 0 else []
+        
+        if len(idx_b) > 0:
+            axes[1, 1].scatter(df_clean.iloc[idx_b]['Flow Duration'] / 1e6, df_clean.iloc[idx_b]['Fwd Packet Length Max'], 
+                                color='green', alpha=0.5, label='Khách hàng (Benign)', s=15)
+        if len(idx_d) > 0:
+            axes[1, 1].scatter(df_clean.iloc[idx_d]['Flow Duration'] / 1e6, df_clean.iloc[idx_d]['Fwd Packet Length Max'], 
+                                color='red', alpha=0.4, label='DDoS Flood (Attack)', s=15)
+        
+        axes[1, 1].set_xlabel('Thời lượng luồng (Flow Duration - giây)')
+        axes[1, 1].set_ylabel('Gói fwd lớn nhất (Fwd Packet Length Max - bytes)')
+        axes[1, 1].set_title('Không gian Quyết định 2D (Decision Space)')
+        axes[1, 1].legend()
+        axes[1, 1].grid(True, linestyle=':', alpha=0.6)
+        
+        plt.tight_layout()
+        comparison_path = os.path.join(config.EXTERNAL_DATA_DIR, "availability_comparison.png")
+        plt.savefig(comparison_path, dpi=300)
+        plt.close()
+        print(f"[+] Đã lưu biểu đồ Phân tích Tính sẵn sàng tại: {comparison_path}")
             
     print("\n" + "=" * 80)
     print("🎉 QUY TRÌNH KIỂM THỬ TÍNH SẴN SÀNG (AVAILABILITY) HOÀN TẤT VỚI KẾT QUẢ AN TOÀN")

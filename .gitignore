@@ -18,10 +18,11 @@ coverage.xml
 *.cover
 .hypothesis/
 
-# Data Files (Do not commit raw/external CSV datasets)
+# Data Files (Do not commit raw/external CSV datasets/images)
 data/raw/*.csv
 data/processed/*.csv
 data/external/*.csv
+data/external/*.png
 !data/raw/mock_cicids2017.csv
 
 # System Files
