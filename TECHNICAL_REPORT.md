@@ -193,19 +193,22 @@ Dưới đây là bảng so sánh sâu về mặt toán học giữa 10 mô hìn
 Dưới đây là các biểu đồ phân tích trực quan được vẽ trực tiếp bằng thư viện `matplotlib` và `seaborn` từ kết quả thực thi kiểm thử 50,000 dòng dữ liệu:
 
 #### A. Heatmaps Ma Trận Nhầm Lẫn (Confusion Matrices)
-Bộ biểu đồ nhiệt thể hiện sự nhầm lẫn giữa luồng khách hàng và luồng tấn công của cả 10 mô hình. Bạn có thể mở ảnh gốc tại: `data/external/confusion_matrices.png`.
-
+Bộ biểu đồ nhiệt 5x2 thể hiện sự nhầm lẫn giữa luồng khách hàng và luồng tấn công của cả 10 mô hình học máy:
 ![Ma trận nhầm lẫn dạng Heatmap của 10 mô hình học máy](data/external/confusion_matrices.png)
 
-#### B. Các Đường Cong Hiệu Năng & Không Gian Quyết Định
-Bộ đồ thị 4 bảng bao gồm:
-1. **Đường cong ROC:** So sánh đường cong ROC và AUC của toàn bộ 10 mô hình.
-2. **Đường cong Precision-Recall:** So sánh khả năng phát hiện/chặn DDoS và độ chính xác của 10 mô hình.
-3. **Đồ thị Trade-off (Đánh đổi):** Chỉ ra ngưỡng quyết định tối ưu đối với mô hình tốt nhất (XGBoost) để cân bằng Bảo mật vs Tính sẵn sàng.
-4. **Không gian Quyết định 2D:** Biểu diễn trực quan tập dữ liệu 50,000 dòng thực tế phân bố theo 2 thuộc tính quan trọng nhất: Flow Duration và Fwd Packet Length Max.
-Bạn có thể mở ảnh gốc tại: `data/external/availability_comparison.png`.
+#### B. Các Đường Cong Hiệu Năng So Sánh (ROC & Precision-Recall)
+Biểu đồ 1x2 thể hiện so sánh tổng quan giữa 10 mô hình học máy phân lớp:
+1. **Đường cong ROC:** So sánh đường cong ROC và AUC của toàn bộ 10 mô hình nhằm phát hiện tỷ lệ chặn DDoS thành công đối chiếu với tỷ lệ chặn nhầm khách hàng.
+2. **Đường cong Precision-Recall:** So sánh khả năng phát hiện/chặn DDoS và độ chính xác của các mô hình khi nhãn mất cân bằng.
+![Đồ thị ROC và Precision-Recall so sánh 10 mô hình](data/external/availability_comparison.png)
 
-![Đồ thị ROC, Precision-Recall, Trade-off Bảo mật vs Tính sẵn sàng và Ranh giới Quyết định 2D cho 10 mô hình](data/external/availability_comparison.png)
+#### C. Biểu Đồ Đánh Đổi Ngưỡng Quyết Định (Trade-off Curves)
+Bộ đồ thị 5x2 thể hiện **DDoS Block Rate (Recall)** và **Customer Availability (TNR)** biến đổi theo ngưỡng quyết định (Decision Threshold) từ 0.0 đến 1.0 cho **từng mô hình riêng biệt**:
+![Đồ thị Trade-off Bảo mật vs Tính sẵn sàng của 10 mô hình](data/external/tradeoff_curves.png)
+
+#### D. Không Gian Quyết Định & Ranh Giới Quyết Định 2D (Decision Space)
+Bộ đồ thị 5x2 thể hiện **biên quyết định phi tuyến** trong không gian đặc trưng 2D (`Flow Duration` vs `Fwd Packet Length Max`) được phủ màu vùng quyết định (contourf) kết hợp với các mẫu thực tế (scatter) cho **từng mô hình riêng biệt**:
+![Ranh giới Quyết định 2D của 10 mô hình](data/external/decision_boundaries.png)
 
 ---
 

@@ -251,6 +251,7 @@ def main():
     model_probs = {}
     model_cms = {}
     model_stats = {}
+    loaded_models = {}
     
     for m_type, m_name in models_config.items():
         model = IDSSupervisedModel(model_type=m_type)
@@ -260,6 +261,7 @@ def main():
             probs = model.predict_proba(X_test_scaled)
             
             model_probs[m_name] = probs
+            loaded_models[m_name] = model
             
             # Tính toán ma trận nhầm lẫn
             from sklearn.metrics import confusion_matrix
@@ -316,7 +318,6 @@ def main():
                 axes_flat[idx].set_title(f'Ma trận Nhầm lẫn: {name}')
                 axes_flat[idx].set_ylabel('Thực tế (Actual)')
                 axes_flat[idx].set_xlabel('Dự đoán (Predicted)')
-        # Tắt các subplot thừa nếu có
         for idx in range(len(model_cms), len(axes_flat)):
             axes_flat[idx].axis('off')
             
@@ -326,89 +327,157 @@ def main():
         plt.close()
         print(f"[+] Đã lưu biểu đồ Ma trận Nhầm lẫn tại: {cm_path}")
         
-    # 5.2 Vẽ biểu đồ Availability & Security Curves (ROC, PR, Threshold, 2D Feature Space)
+    # 5.2 Vẽ biểu đồ ROC & PR Curves so sánh cả 10 mô hình (1 hàng, 2 cột)
     if model_probs:
         from sklearn.metrics import roc_curve, auc, precision_recall_curve
-        fig, axes = plt.subplots(2, 2, figsize=(15, 13))
+        fig, axes = plt.subplots(1, 2, figsize=(16, 7))
         
         # Subplot 1: ROC Curve cho cả 10 mô hình
         for name, probs in model_probs.items():
             fpr, tpr, _ = roc_curve(y_true_binary, probs)
             roc_auc = auc(fpr, tpr)
-            axes[0, 0].plot(fpr, tpr, lw=2, label=f'{name} (AUC = {roc_auc:.3f})')
-        axes[0, 0].plot([0, 1], [0, 1], color='gray', linestyle='--')
-        axes[0, 0].set_xlim([0.0, 1.0])
-        axes[0, 0].set_ylim([0.0, 1.05])
-        axes[0, 0].set_xlabel('Tỷ lệ chặn nhầm khách hàng (False Positive Rate)')
-        axes[0, 0].set_ylabel('Tỷ lệ chặn DDoS thành công (True Positive Rate)')
-        axes[0, 0].set_title('Đường cong ROC của các Mô hình')
-        axes[0, 0].legend(loc="lower right", fontsize='small')
-        axes[0, 0].grid(True, linestyle=':', alpha=0.6)
+            axes[0].plot(fpr, tpr, lw=2, label=f'{name} (AUC = {roc_auc:.3f})')
+        axes[0].plot([0, 1], [0, 1], color='gray', linestyle='--')
+        axes[0].set_xlim([0.0, 1.0])
+        axes[0].set_ylim([0.0, 1.05])
+        axes[0].set_xlabel('Tỷ lệ chặn nhầm khách hàng (False Positive Rate)')
+        axes[0].set_ylabel('Tỷ lệ chặn DDoS thành công (True Positive Rate)')
+        axes[0].set_title('Đường cong ROC của các Mô hình')
+        axes[0].legend(loc="lower right", fontsize='small')
+        axes[0].grid(True, linestyle=':', alpha=0.6)
         
         # Subplot 2: Precision-Recall Curve cho cả 10 mô hình
         for name, probs in model_probs.items():
             prec, rec, _ = precision_recall_curve(y_true_binary, probs)
-            axes[0, 1].plot(rec, prec, lw=2, label=f'{name}')
-        axes[0, 1].set_xlim([0.0, 1.0])
-        axes[0, 1].set_ylim([0.0, 1.05])
-        axes[0, 1].set_xlabel('Tỷ lệ chặn DDoS thành công (Recall)')
-        axes[0, 1].set_ylabel('Độ chuẩn xác chặn DDoS (Precision)')
-        axes[0, 1].set_title('Đường cong Precision-Recall')
-        axes[0, 1].legend(loc="lower left", fontsize='small')
-        axes[0, 1].grid(True, linestyle=':', alpha=0.6)
-        
-        # Subplot 3: Trade-off giữa Security (DDoS Block) và Availability (Customer Allowed) theo Threshold (XGBoost)
-        if 'XGBoost' in model_probs:
-            xgb_p = model_probs['XGBoost']
-            thresholds = np.linspace(0, 1, 100)
-            block_rates = []
-            availabilities = []
-            for t in thresholds:
-                preds_t = (xgb_p >= t).astype(int)
-                cm_t = confusion_matrix(y_true_binary, preds_t)
-                tn_t, fp_t, fn_t, tp_t = cm_t.ravel()
-                block_rates.append(tp_t / (tp_t + fn_t) * 100 if (tp_t + fn_t) > 0 else 0)
-                availabilities.append(tn_t / (tn_t + fp_t) * 100 if (tn_t + fp_t) > 0 else 0)
-            axes[1, 0].plot(thresholds, block_rates, 'r-', lw=2, label='Chặn DDoS (DDoS Block Rate)')
-            axes[1, 0].plot(thresholds, availabilities, 'g-', lw=2, label='Tính sẵn sàng cho Khách (Availability)')
-            axes[1, 0].axvline(0.5, color='blue', linestyle=':', label='Ngưỡng Mặc định (0.5)')
-            axes[1, 0].set_xlabel('Ngưỡng ra quyết định (Decision Threshold)')
-            axes[1, 0].set_ylabel('Tỷ lệ phần trạng (%)')
-            axes[1, 0].set_title('Bảo mật vs Tính Sẵn sàng (XGBoost)')
-            axes[1, 0].legend(loc="lower center")
-            axes[1, 0].grid(True, linestyle=':', alpha=0.6)
-        else:
-            axes[1, 0].text(0.5, 0.5, 'Cần nạp mô hình XGBoost để vẽ', ha='center', va='center')
-            
-        # Subplot 4: Phân tán 2D các Đặc trưng và Ranh giới Quyết định (Decision Space)
-        benign_indices = (y_true_binary == 0)
-        ddos_indices = (y_true_binary == 1)
-        
-        # Tránh lỗi chọn mẫu nếu số lượng quá nhỏ
-        size_b = min(500, sum(benign_indices))
-        size_d = min(500, sum(ddos_indices))
-        
-        idx_b = np.random.choice(np.where(benign_indices)[0], size=size_b, replace=False) if size_b > 0 else []
-        idx_d = np.random.choice(np.where(ddos_indices)[0], size=size_d, replace=False) if size_d > 0 else []
-        
-        if len(idx_b) > 0:
-            axes[1, 1].scatter(df_clean.iloc[idx_b]['Flow Duration'] / 1e6, df_clean.iloc[idx_b]['Fwd Packet Length Max'], 
-                                color='green', alpha=0.5, label='Khách hàng (Benign)', s=15)
-        if len(idx_d) > 0:
-            axes[1, 1].scatter(df_clean.iloc[idx_d]['Flow Duration'] / 1e6, df_clean.iloc[idx_d]['Fwd Packet Length Max'], 
-                                color='red', alpha=0.4, label='DDoS Flood (Attack)', s=15)
-        
-        axes[1, 1].set_xlabel('Thời lượng luồng (Flow Duration - giây)')
-        axes[1, 1].set_ylabel('Gói fwd lớn nhất (Fwd Packet Length Max - bytes)')
-        axes[1, 1].set_title('Không gian Quyết định 2D (Decision Space)')
-        axes[1, 1].legend()
-        axes[1, 1].grid(True, linestyle=':', alpha=0.6)
+            axes[1].plot(rec, prec, lw=2, label=f'{name}')
+        axes[1].set_xlim([0.0, 1.0])
+        axes[1].set_ylim([0.0, 1.05])
+        axes[1].set_xlabel('Tỷ lệ chặn DDoS thành công (Recall)')
+        axes[1].set_ylabel('Độ chuẩn xác chặn DDoS (Precision)')
+        axes[1].set_title('Đường cong Precision-Recall')
+        axes[1].legend(loc="lower left", fontsize='small')
+        axes[1].grid(True, linestyle=':', alpha=0.6)
         
         plt.tight_layout()
         comparison_path = os.path.join(config.EXTERNAL_DATA_DIR, "availability_comparison.png")
-        plt.savefig(comparison_path, dpi=300)
+        plt.savefig(comparison_path, dpi=200)
         plt.close()
-        print(f"[+] Đã lưu biểu đồ Phân tích Tính sẵn sàng tại: {comparison_path}")
+        print(f"[+] Đã lưu biểu đồ ROC/PR tại: {comparison_path}")
+        
+    # 5.3 Vẽ biểu đồ Trade-off Bảo mật vs Sẵn sàng cho từng mô hình riêng lẻ (5 hàng, 2 cột)
+    if model_probs:
+        fig, axes = plt.subplots(5, 2, figsize=(14, 22))
+        axes_flat = axes.flatten()
+        
+        for idx, (name, probs) in enumerate(model_probs.items()):
+            if idx < len(axes_flat):
+                thresholds = np.linspace(0, 1, 100)
+                block_rates = []
+                availabilities = []
+                for t in thresholds:
+                    preds_t = (probs >= t).astype(int)
+                    tp_t = np.sum((y_true_binary == 1) & (preds_t == 1))
+                    fn_t = np.sum((y_true_binary == 1) & (preds_t == 0))
+                    tn_t = np.sum((y_true_binary == 0) & (preds_t == 0))
+                    fp_t = np.sum((y_true_binary == 0) & (preds_t == 1))
+                    
+                    block_rates.append(tp_t / (tp_t + fn_t) * 100 if (tp_t + fn_t) > 0 else 0.0)
+                    availabilities.append(tn_t / (tn_t + fp_t) * 100 if (tn_t + fp_t) > 0 else 0.0)
+                
+                axes_flat[idx].plot(thresholds, block_rates, 'r-', lw=2, label='Chặn DDoS (Recall)')
+                axes_flat[idx].plot(thresholds, availabilities, 'g-', lw=2, label='Khách Sẵn sàng (TNR)')
+                axes_flat[idx].axvline(0.5, color='blue', linestyle=':', label='Ngưỡng 0.5')
+                axes_flat[idx].set_title(f'Trade-off: {name}')
+                axes_flat[idx].set_xlabel('Decision Threshold')
+                axes_flat[idx].set_ylabel('Phần trăm (%)')
+                axes_flat[idx].grid(True, linestyle=':', alpha=0.6)
+                if idx == 0:
+                    axes_flat[idx].legend(loc="lower center", fontsize='x-small')
+                    
+        for idx in range(len(model_probs), len(axes_flat)):
+            axes_flat[idx].axis('off')
+            
+        plt.tight_layout()
+        tradeoff_path = os.path.join(config.EXTERNAL_DATA_DIR, "tradeoff_curves.png")
+        plt.savefig(tradeoff_path, dpi=200)
+        plt.close()
+        print(f"[+] Đã lưu biểu đồ Trade-off 10 mô hình tại: {tradeoff_path}")
+        
+    # 5.4 Vẽ Không gian Quyết định 2D (Decision Space) cho từng mô hình riêng lẻ (5 hàng, 2 cột)
+    if loaded_models:
+        from matplotlib.colors import ListedColormap
+        fig, axes = plt.subplots(5, 2, figsize=(15, 24))
+        axes_flat = axes.flatten()
+        
+        # 1. Xác định biên trong không gian đặc trưng gốc
+        duration_min, duration_max = df_clean['Flow Duration'].min(), df_clean['Flow Duration'].max()
+        fwd_len_min, fwd_len_max = df_clean['Fwd Packet Length Max'].min(), df_clean['Fwd Packet Length Max'].max()
+        
+        # 2. Tạo grid mesh
+        grid_res = 40  # 40x40 cho tốc độ chạy nhanh và hiển thị mượt
+        xx, yy = np.meshgrid(
+            np.linspace(duration_min, duration_max, grid_res),
+            np.linspace(fwd_len_min, fwd_len_max, grid_res)
+        )
+        
+        # 3. Tạo DataFrame cho grid để chuyển qua scaler
+        grid_flat_x = xx.ravel()
+        grid_flat_y = yy.ravel()
+        grid_df = pd.DataFrame(index=range(len(grid_flat_x)))
+        for col in config.SELECTED_FEATURES:
+            if col == 'Flow Duration':
+                grid_df[col] = grid_flat_x
+            elif col == 'Fwd Packet Length Max':
+                grid_df[col] = grid_flat_y
+            else:
+                # Giá trị trung bình để làm mốc nền
+                grid_df[col] = df_clean[col].mean()
+                
+        # 4. Scale đặc trưng của grid
+        grid_df_scaled = preprocessor.transform(grid_df)
+        
+        # 5. Chọn mẫu ngẫu nhiên từ tập kiểm thử để scatter lên biểu đồ (tránh làm chậm hình)
+        benign_indices = (y_true_binary == 0)
+        ddos_indices = (y_true_binary == 1)
+        size_b = min(150, sum(benign_indices))
+        size_d = min(150, sum(ddos_indices))
+        idx_b = np.random.choice(np.where(benign_indices)[0], size=size_b, replace=False) if size_b > 0 else []
+        idx_d = np.random.choice(np.where(ddos_indices)[0], size=size_d, replace=False) if size_d > 0 else []
+        
+        custom_cmap = ListedColormap(['#d4edda', '#f8d7da'])  # Xanh nhạt cho benign, đỏ nhạt cho attack
+        
+        for idx, (name, model) in enumerate(loaded_models.items()):
+            if idx < len(axes_flat):
+                # Dự đoán lớp trên toàn grid
+                preds_grid = model.predict(grid_df_scaled)
+                zz = preds_grid.reshape(xx.shape)
+                
+                # Vẽ vùng quyết định (contour)
+                axes_flat[idx].contourf(xx / 1e6, yy, zz, alpha=0.4, cmap=custom_cmap)
+                
+                # Vẽ các điểm thực tế
+                if len(idx_b) > 0:
+                    axes_flat[idx].scatter(df_clean.iloc[idx_b]['Flow Duration'] / 1e6, df_clean.iloc[idx_b]['Fwd Packet Length Max'],
+                                           color='green', alpha=0.7, label='Khách hàng' if idx == 0 else "", s=15, edgecolors='k', linewidths=0.2)
+                if len(idx_d) > 0:
+                    axes_flat[idx].scatter(df_clean.iloc[idx_d]['Flow Duration'] / 1e6, df_clean.iloc[idx_d]['Fwd Packet Length Max'],
+                                           color='red', alpha=0.6, label='DDoS' if idx == 0 else "", s=15, edgecolors='k', linewidths=0.2)
+                
+                axes_flat[idx].set_title(f'Quyết định 2D: {name}')
+                axes_flat[idx].set_xlabel('Thời lượng (s)')
+                axes_flat[idx].set_ylabel('Fwd Pkt Max (bytes)')
+                axes_flat[idx].grid(True, linestyle=':', alpha=0.4)
+                if idx == 0:
+                    axes_flat[idx].legend(loc="upper right", fontsize='x-small')
+                    
+        for idx in range(len(loaded_models), len(axes_flat)):
+            axes_flat[idx].axis('off')
+            
+        plt.tight_layout()
+        boundaries_path = os.path.join(config.EXTERNAL_DATA_DIR, "decision_boundaries.png")
+        plt.savefig(boundaries_path, dpi=200)
+        plt.close()
+        print(f"[+] Đã lưu biểu đồ Ranh giới Quyết định 2D cho 10 mô hình tại: {boundaries_path}")
             
     print("\n" + "=" * 80)
     print("🎉 QUY TRÌNH KIỂM THỬ TÍNH SẴN SÀNG (AVAILABILITY) HOÀN TẤT VỚI KẾT QUẢ AN TOÀN")
@@ -424,6 +493,8 @@ def main():
             os.system("start TECHNICAL_REPORT.md")
             os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "confusion_matrices.png")}"')
             os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "availability_comparison.png")}"')
+            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "tradeoff_curves.png")}"')
+            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "decision_boundaries.png")}"')
     except Exception as e:
         print(f"[!] Không thể tự động mở tệp: {e}")
 
