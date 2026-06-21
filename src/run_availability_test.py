@@ -386,6 +386,19 @@ def main():
     print("\n" + "=" * 80)
     print("🎉 QUY TRÌNH KIỂM THỬ TÍNH SẴN SÀNG (AVAILABILITY) HOÀN TẤT VỚI KẾT QUẢ AN TOÀN")
     print("=" * 80)
+    print("[+] Báo cáo phân tích kỹ thuật chi tiết đã được lưu tại: TECHNICAL_REPORT.md ở thư mục gốc.")
+    print("[+] Các biểu đồ trực quan đã được lưu tại thư mục: data/external/")
+    
+    try:
+        # Prompt hỏi người dùng mở báo cáo và hình ảnh trực tiếp
+        confirm = input("\n👉 Bạn có muốn tự động mở báo cáo (TECHNICAL_REPORT.md) và các biểu đồ ảnh vừa vẽ không? (y/n): ").strip().lower()
+        if confirm in ['y', 'yes']:
+            print("[*] Đang mở tệp báo cáo và biểu đồ ảnh...")
+            os.system("start TECHNICAL_REPORT.md")
+            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "confusion_matrices.png")}"')
+            os.system(f'start "" "{os.path.join(config.EXTERNAL_DATA_DIR, "availability_comparison.png")}"')
+    except Exception as e:
+        print(f"[!] Không thể tự động mở tệp: {e}")
 
 if __name__ == "__main__":
     main()
