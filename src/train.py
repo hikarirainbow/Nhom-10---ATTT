@@ -83,48 +83,70 @@ def main():
     # 3. Cân bằng dữ liệu (Chỉ áp dụng cho Supervised)
     X_bal, y_bal = preprocessor.balance_data(X, y, strategy='undersample', ratio=1.0)
     
+    # Giới hạn kích thước mẫu huấn luyện tối đa là 15,000 dòng để 10 mô hình chạy nhanh
+    max_samples = 15000
+    if len(X_bal) > max_samples:
+        print(f"\n[*] Đang thu nhỏ mẫu xuống {max_samples} dòng (vẫn giữ cân bằng 50/50) để tăng tốc huấn luyện 10 mô hình...")
+        df_temp = pd.concat([X_bal, y_bal], axis=1)
+        # Tách hai nhãn và lấy mẫu
+        df_benign = df_temp[df_temp[y_bal.name] == 0].sample(n=max_samples // 2, random_state=42)
+        df_attack = df_temp[df_temp[y_bal.name] == 1].sample(n=max_samples // 2, random_state=42)
+        df_shuffled = pd.concat([df_benign, df_attack]).sample(frac=1.0, random_state=42).reset_index(drop=True)
+        X_bal = df_shuffled[config.SELECTED_FEATURES]
+        y_bal = df_shuffled[y_bal.name]
+    
     # Chia tập Train / Test
     X_train, X_test, y_train, y_test = train_test_split(X_bal, y_bal, test_size=0.2, random_state=42)
     
     # Lưu kết quả đánh giá để so sánh cuối cùng
     comparison_results = {}
     
-    # 4. Huấn luyện mô hình Học có giám sát (Random Forest & XGBoost)
-    # a. Random Forest
-    rf_ids = IDSSupervisedModel(model_type='rf')
-    rf_ids.build()
-    rf_ids.train(X_train, y_train)
-    rf_ids.save()
+    # Danh sách 10 mô hình học máy phân lớp có giám sát
+    supervised_models_config = {
+        'rf': 'Random Forest',
+        'xgb': 'XGBoost',
+        'dt': 'Decision Tree',
+        'et': 'Extra Trees',
+        'ada': 'AdaBoost',
+        'gb': 'Gradient Boosting',
+        'knn': 'K-Nearest Neighbors',
+        'lr': 'Logistic Regression',
+        'svm': 'Linear SVM',
+        'nb': 'Naive Bayes'
+    }
     
-    # Đánh giá Random Forest
-    rf_preds = rf_ids.predict(X_test)
-    rf_acc = accuracy_score(y_test, rf_preds)
-    comparison_results["Random Forest"] = rf_acc
-    print("\n=== ĐÁNH GIÁ MÔ HÌNH RANDOM FOREST ===")
-    print(f"Accuracy: {rf_acc:.4f}")
-    print(classification_report(y_test, rf_preds, target_names=['Benign', 'Attack'], zero_division=0))
-    print_ascii_confusion_matrix(confusion_matrix(y_test, rf_preds))
-    
-    # b. XGBoost
-    xgb_ids = IDSSupervisedModel(model_type='xgb')
-    xgb_ids.build()
-    xgb_ids.train(X_train, y_train)
-    xgb_ids.save()
-    
-    # Đánh giá XGBoost
-    xgb_preds = xgb_ids.predict(X_test)
-    xgb_acc = accuracy_score(y_test, xgb_preds)
-    comparison_results["XGBoost"] = xgb_acc
-    print("\n=== ĐÁNH GIÁ MÔ HÌNH XGBOOST ===")
-    print(f"Accuracy: {xgb_acc:.4f}")
-    print(classification_report(y_test, xgb_preds, target_names=['Benign', 'Attack'], zero_division=0))
-    print_ascii_confusion_matrix(confusion_matrix(y_test, xgb_preds))
-    
+    # 4. Huấn luyện và Đánh giá tuần tự 10 mô hình giám sát
+    for m_type, m_name in supervised_models_config.items():
+        print("\n" + "=" * 65)
+        print(f" HUẤN LUYỆN & ĐÁNH GIÁ MÔ HÌNH: {m_name.upper()} ({m_type})")
+        print("=" * 65)
+        
+        clf = IDSSupervisedModel(model_type=m_type)
+        try:
+            clf.build()
+            clf.train(X_train, y_train)
+            clf.save()
+            
+            # Dự đoán và tính toán Accuracy
+            preds = clf.predict(X_test)
+            acc = accuracy_score(y_test, preds)
+            comparison_results[m_name] = acc
+            
+            print(f"\n[+] Kết quả {m_name}: Accuracy = {acc:.4f}")
+            print(classification_report(y_test, preds, target_names=['Benign', 'Attack'], zero_division=0))
+            print_ascii_confusion_matrix(confusion_matrix(y_test, preds))
+        except Exception as e:
+            print(f"[!] Lỗi khi huấn luyện {m_name}: {e}")
+            
     # 5. Huấn luyện mô hình Học không giám sát (Isolation Forest)
     # Lấy các dòng Benign từ tập train để huấn luyện
     X_train_benign = X_train[y_train == 0]
     
     if len(X_train_benign) > 0:
+        print("\n" + "=" * 65)
+        print(" HUẤN LUYỆN MÔ HÌNH KHÔNG GIÁM SÁT: ISOLATION FOREST")
+        print("=" * 65)
+        
         anomaly_ids = IDSUnsupervisedModel()
         anomaly_ids.train(X_train_benign)
         anomaly_ids.save()
@@ -133,15 +155,14 @@ def main():
         anomaly_preds = anomaly_ids.predict(X_test)
         anomaly_acc = accuracy_score(y_test, anomaly_preds)
         comparison_results["Isolation Forest (Anomaly)"] = anomaly_acc
-        print("\n=== ĐÁNH GIÁ MÔ HÌNH ISOLATION FOREST (ANOMALY DETECTION) ===")
-        print(f"Accuracy: {anomaly_acc:.4f}")
+        print(f"\n[+] Kết quả Isolation Forest: Accuracy = {anomaly_acc:.4f}")
         print(classification_report(y_test, anomaly_preds, target_names=['Benign', 'Attack'], zero_division=0))
         print_ascii_confusion_matrix(confusion_matrix(y_test, anomaly_preds))
     else:
         print("[!] Không đủ dữ liệu Benign để huấn luyện Isolation Forest.")
         
     # Trực quan hóa so sánh độ chính xác của các mô hình học trên terminal
-    print_ascii_bar_chart(comparison_results, title="🏆 SO SÁNH ĐỘ CHÍNH XÁC (ACCURACY) CÁC MÔ HÌNH")
-
+    print_ascii_bar_chart(comparison_results, title="🏆 SO SÁNH ĐỘ CHÍNH XÁC (ACCURACY) CỦA 11 THUẬT TOÁN")
+ 
 if __name__ == "__main__":
     main()

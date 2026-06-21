@@ -235,110 +235,117 @@ def main():
     print("🧠 BƯỚC 4: ĐÁNH GIÁ HIỆU NĂNG MÔ HÌNH AI & ĐO LƯỜNG TÍNH SẴN SÀNG MÁY CHỦ")
     print("=" * 80)
     
-    models = {
-        'Random Forest': IDSSupervisedModel(model_type='rf'),
-        'XGBoost': IDSSupervisedModel(model_type='xgb')
+    models_config = {
+        'rf': 'Random Forest',
+        'xgb': 'XGBoost',
+        'dt': 'Decision Tree',
+        'et': 'Extra Trees',
+        'ada': 'AdaBoost',
+        'gb': 'Gradient Boosting',
+        'knn': 'K-Nearest Neighbors',
+        'lr': 'Logistic Regression',
+        'svm': 'Linear SVM',
+        'nb': 'Naive Bayes'
     }
     
     model_probs = {}
     model_cms = {}
+    model_stats = {}
     
-    for name, model in models.items():
+    for m_type, m_name in models_config.items():
+        model = IDSSupervisedModel(model_type=m_type)
         try:
             model.load()
             preds = model.predict(X_test_scaled)
             probs = model.predict_proba(X_test_scaled)
             
-            model_probs[name] = probs
+            model_probs[m_name] = probs
             
             # Tính toán ma trận nhầm lẫn
             from sklearn.metrics import confusion_matrix
             cm = confusion_matrix(y_true_binary, preds)
-            model_cms[name] = cm
+            model_cms[m_name] = cm
             tn, fp, fn, tp = cm.ravel()
             
-            # Tính toán các chỉ số an ninh và vận hành
+            # Tính toán các chỉ số
             ddos_block_rate = (tp / (tp + fn)) * 100 if (tp + fn) > 0 else 0.0
             customer_availability = (tn / (tn + fp)) * 100 if (tn + fp) > 0 else 0.0
             customer_blocked_rate = (fp / (tn + fp)) * 100 if (tn + fp) > 0 else 0.0
             accuracy = ((tp + tn) / len(y_true_binary)) * 100
             
-            # Phân loại trạng thái vận hành của hệ thống
-            if customer_availability >= 99.5:
-                status = "🟢 XUẤT SẮC (Excellent) - Máy chủ thông suốt hoàn toàn cho khách hàng."
-            elif customer_availability >= 95.0:
-                status = "🟡 TỐT (Good) - Hầu hết khách hàng truy cập bình thường."
-            else:
-                status = "🔴 CẦN CẢI THIỆN (Critical) - Nhiều khách hàng bị chặn nhầm, ảnh hưởng tính sẵn sàng!"
-                
-            print(f"\n📈 KẾT QUẢ VẬN HÀNH MÔ HÌNH: {name.upper()}")
-            print("-" * 55)
-            print(f"⚡ Tổng số luồng kiểm thử thực tế: {len(y_true_binary):,}")
-            print(f"🔒 Tỷ lệ chặn tấn công DDoS (DDoS Block Rate): {ddos_block_rate:.2f}% (Chặn thành công {tp:,}/{tp+fn:,} luồng dồn dập)")
-            print(f"👥 Tỷ lệ sẵn sàng cho khách hàng (Customer Availability): {customer_availability:.2f}% (Thông suốt {tn:,}/{tn+fp:,} luồng khách hàng)")
-            print(f"⚠️  Tỷ lệ chặn nhầm khách hàng (Customer Block Rate): {customer_blocked_rate:.2f}% (Bị từ chối dịch vụ nhầm: {fp:,} khách)")
-            print(f"🎯 Độ chính xác tổng thể (Accuracy): {accuracy:.2f}%")
-            print(f"📋 Đánh giá trạng thái vận hành: {status}")
+            model_stats[m_name] = {
+                'ddos_block': ddos_block_rate,
+                'customer_avail': customer_availability,
+                'customer_blocked': customer_blocked_rate,
+                'acc': accuracy,
+                'tp': tp,
+                'tn': tn,
+                'fp': fp,
+                'fn': fn
+            }
             
-            print_ascii_confusion_matrix(cm, labels=["Benign (Khách)", "Attack (DDoS)"])
-            
-            # Vẽ biểu đồ ASCII hiển thị số lượng được chặn/cho qua
-            print_ascii_bar_chart(
-                {
-                    "Chặn đứng DDoS (Đúng)": tp,
-                    "Thông suốt Khách (Đúng)": tn,
-                    "Chặn nhầm Khách (Sai)": fp,
-                    "Bỏ lọt DDoS (Sai)": fn
-                },
-                title=f"📊 PHÂN BỐ XỬ LÝ LƯU LƯỢNG MẠNG ({name.upper()})"
-            )
+            print(f"[+] Đã hoàn thành đánh giá {m_name} (Accuracy: {accuracy:.2f}%)")
             
         except FileNotFoundError:
-            print(f"[!] Bỏ qua đánh giá {name}: Không tìm thấy file mô hình đã huấn luyện.")
+            print(f"[!] Bỏ qua đánh giá {m_name}: Không tìm thấy file mô hình.")
             
+    # In bảng so sánh trên Console
+    print("\n" + "=" * 85)
+    print("📊 BẢNG SO SÁNH HIỆU NĂNG 10 MÔ HÌNH (AVAILABILITY VS SECURITY)")
+    print("=" * 85)
+    print(f" {'Mô hình':<22} | {'Chặn DDoS (Recall)':<20} | {'Khách Sẵn sàng (TNR)':<20} | {'Độ chính xác':<15}")
+    print("-" * 85)
+    for name, stats in model_stats.items():
+        print(f" {name:<22} | {stats['ddos_block']:>18.2f}% | {stats['customer_avail']:>18.2f}% | {stats['acc']:>13.2f}%")
+    print("=" * 85)
+    
     # 5. Vẽ biểu đồ chất lượng bằng Matplotlib & Seaborn
     print("\n" + "=" * 80)
     print("📈 BƯỚC 5: TẠO CÁC BIỂU ĐỒ PHÂN TÍCH TOÁN HỌC PHỨC TẠP BẰNG MATPLOTLIB")
     print("=" * 80)
     
-    # 5.1 Vẽ biểu đồ Confusion Matrices Heatmap
+    # 5.1 Vẽ biểu đồ Confusion Matrices Heatmap cho 10 mô hình (5 hàng, 2 cột)
     if model_cms:
-        fig, axes = plt.subplots(1, len(model_cms), figsize=(12, 5))
-        if len(model_cms) == 1:
-            axes = [axes]
+        fig, axes = plt.subplots(5, 2, figsize=(12, 22))
+        axes_flat = axes.flatten()
         for idx, (name, cm) in enumerate(model_cms.items()):
-            sns.heatmap(cm, annot=True, fmt=',d', cmap='Blues', cbar=False, ax=axes[idx],
-                        xticklabels=['Benign (Khách)', 'Attack (DDoS)'],
-                        yticklabels=['Benign (Khách)', 'Attack (DDoS)'])
-            axes[idx].set_title(f'Ma trận Nhầm lẫn: {name}')
-            axes[idx].set_ylabel('Thực tế (Actual)')
-            axes[idx].set_xlabel('Dự đoán (Predicted)')
+            if idx < len(axes_flat):
+                sns.heatmap(cm, annot=True, fmt=',d', cmap='Blues', cbar=False, ax=axes_flat[idx],
+                            xticklabels=['Benign (Khách)', 'Attack (DDoS)'],
+                            yticklabels=['Benign (Khách)', 'Attack (DDoS)'])
+                axes_flat[idx].set_title(f'Ma trận Nhầm lẫn: {name}')
+                axes_flat[idx].set_ylabel('Thực tế (Actual)')
+                axes_flat[idx].set_xlabel('Dự đoán (Predicted)')
+        # Tắt các subplot thừa nếu có
+        for idx in range(len(model_cms), len(axes_flat)):
+            axes_flat[idx].axis('off')
+            
         plt.tight_layout()
         cm_path = os.path.join(config.EXTERNAL_DATA_DIR, "confusion_matrices.png")
-        plt.savefig(cm_path, dpi=300)
+        plt.savefig(cm_path, dpi=200)
         plt.close()
         print(f"[+] Đã lưu biểu đồ Ma trận Nhầm lẫn tại: {cm_path}")
         
     # 5.2 Vẽ biểu đồ Availability & Security Curves (ROC, PR, Threshold, 2D Feature Space)
     if model_probs:
         from sklearn.metrics import roc_curve, auc, precision_recall_curve
-        fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+        fig, axes = plt.subplots(2, 2, figsize=(15, 13))
         
-        # Subplot 1: ROC Curve
+        # Subplot 1: ROC Curve cho cả 10 mô hình
         for name, probs in model_probs.items():
             fpr, tpr, _ = roc_curve(y_true_binary, probs)
             roc_auc = auc(fpr, tpr)
-            axes[0, 0].plot(fpr, tpr, lw=2, label=f'{name} (AUC = {roc_auc:.4f})')
+            axes[0, 0].plot(fpr, tpr, lw=2, label=f'{name} (AUC = {roc_auc:.3f})')
         axes[0, 0].plot([0, 1], [0, 1], color='gray', linestyle='--')
         axes[0, 0].set_xlim([0.0, 1.0])
         axes[0, 0].set_ylim([0.0, 1.05])
         axes[0, 0].set_xlabel('Tỷ lệ chặn nhầm khách hàng (False Positive Rate)')
         axes[0, 0].set_ylabel('Tỷ lệ chặn DDoS thành công (True Positive Rate)')
-        axes[0, 0].set_title('Đường cong ROC')
-        axes[0, 0].legend(loc="lower right")
+        axes[0, 0].set_title('Đường cong ROC của các Mô hình')
+        axes[0, 0].legend(loc="lower right", fontsize='small')
         axes[0, 0].grid(True, linestyle=':', alpha=0.6)
         
-        # Subplot 2: Precision-Recall Curve
+        # Subplot 2: Precision-Recall Curve cho cả 10 mô hình
         for name, probs in model_probs.items():
             prec, rec, _ = precision_recall_curve(y_true_binary, probs)
             axes[0, 1].plot(rec, prec, lw=2, label=f'{name}')
@@ -347,7 +354,7 @@ def main():
         axes[0, 1].set_xlabel('Tỷ lệ chặn DDoS thành công (Recall)')
         axes[0, 1].set_ylabel('Độ chuẩn xác chặn DDoS (Precision)')
         axes[0, 1].set_title('Đường cong Precision-Recall')
-        axes[0, 1].legend(loc="lower left")
+        axes[0, 1].legend(loc="lower left", fontsize='small')
         axes[0, 1].grid(True, linestyle=':', alpha=0.6)
         
         # Subplot 3: Trade-off giữa Security (DDoS Block) và Availability (Customer Allowed) theo Threshold (XGBoost)
@@ -366,7 +373,7 @@ def main():
             axes[1, 0].plot(thresholds, availabilities, 'g-', lw=2, label='Tính sẵn sàng cho Khách (Availability)')
             axes[1, 0].axvline(0.5, color='blue', linestyle=':', label='Ngưỡng Mặc định (0.5)')
             axes[1, 0].set_xlabel('Ngưỡng ra quyết định (Decision Threshold)')
-            axes[1, 0].set_ylabel('Tỷ lệ phần trăm (%)')
+            axes[1, 0].set_ylabel('Tỷ lệ phần trạng (%)')
             axes[1, 0].set_title('Bảo mật vs Tính Sẵn sàng (XGBoost)')
             axes[1, 0].legend(loc="lower center")
             axes[1, 0].grid(True, linestyle=':', alpha=0.6)

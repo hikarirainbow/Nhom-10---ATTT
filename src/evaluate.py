@@ -62,65 +62,50 @@ def main():
         # Nhị phân hóa nhãn kiểm thử
         y_test_binary = df_test[label_col].apply(lambda x: 0 if str(x).strip().lower() in ['benign', '0', 'normal'] else 1)
         
-    # 3. Load và đánh giá mô hình Random Forest
-    rf_model = IDSSupervisedModel(model_type='rf')
-    try:
-        rf_model.load()
-        rf_preds = rf_model.predict(X_test_scaled)
-        
-        print("\n" + "="*65)
-        print(" KẾT QUẢ ĐÁNH GIÁ MÔ HÌNH RANDOM FOREST TRÊN DỮ LIỆU NGOÀI")
-        print("="*65)
-        
-        if y_test_binary is not None:
-            print(f"Accuracy: {accuracy_score(y_test_binary, rf_preds):.4f}")
-            print(classification_report(y_test_binary, rf_preds, target_names=['Benign', 'Attack'], zero_division=0))
-            print_ascii_confusion_matrix(confusion_matrix(y_test_binary, rf_preds))
+    # Danh sách 10 mô hình học máy phân lớp giám sát
+    models_config = {
+        'rf': 'Random Forest',
+        'xgb': 'XGBoost',
+        'dt': 'Decision Tree',
+        'et': 'Extra Trees',
+        'ada': 'AdaBoost',
+        'gb': 'Gradient Boosting',
+        'knn': 'K-Nearest Neighbors',
+        'lr': 'Logistic Regression',
+        'svm': 'Linear SVM',
+        'nb': 'Naive Bayes'
+    }
+    
+    # 3. Đánh giá tuần tự từng mô hình
+    for m_type, m_name in models_config.items():
+        model = IDSSupervisedModel(model_type=m_type)
+        try:
+            model.load()
+            preds = model.predict(X_test_scaled)
             
-            # Vẽ biểu đồ ASCII phân phối dự đoán
-            attacks = int(sum(rf_preds))
-            benign = len(rf_preds) - attacks
-            print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title="📊 PHÂN BỐ LƯU LƯỢNG MẠNG DỰ ĐOÁN (RANDOM FOREST)")
-        else:
-            total = len(rf_preds)
-            attacks = int(sum(rf_preds))
-            benign = total - attacks
-            print(f"Tổng số luồng phân tích: {total}")
-            print(f"Phát hiện luồng bất thường: {attacks} ({attacks/total*100:.2f}%)")
-            print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title="📊 PHÂN BỐ LƯU LƯỢNG MẠNG PHÁT HIỆN")
+            print("\n" + "="*65)
+            print(f" KẾT QUẢ ĐÁNH GIÁ MÔ HÌNH {m_name.upper()} ({m_type})")
+            print("="*65)
             
-    except FileNotFoundError:
-        print("[!] Không thấy mô hình Random Forest đã lưu. Bỏ qua.")
-        
-    # 4. Load và đánh giá mô hình XGBoost
-    xgb_model = IDSSupervisedModel(model_type='xgb')
-    try:
-        xgb_model.load()
-        xgb_preds = xgb_model.predict(X_test_scaled)
-        
-        print("\n" + "="*65)
-        print(" KẾT QUẢ ĐÁNH GIÁ MÔ HÌNH XGBOOST TRÊN DỮ LIỆU NGOÀI")
-        print("="*65)
-        
-        if y_test_binary is not None:
-            print(f"Accuracy: {accuracy_score(y_test_binary, xgb_preds):.4f}")
-            print(classification_report(y_test_binary, xgb_preds, target_names=['Benign', 'Attack'], zero_division=0))
-            print_ascii_confusion_matrix(confusion_matrix(y_test_binary, xgb_preds))
-            
-            # Vẽ biểu đồ ASCII phân phối dự đoán
-            attacks = int(sum(xgb_preds))
-            benign = len(xgb_preds) - attacks
-            print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title="📊 PHÂN BỐ LƯU LƯỢNG MẠNG DỰ ĐOÁN (XGBOOST)")
-        else:
-            total = len(xgb_preds)
-            attacks = int(sum(xgb_preds))
-            benign = total - attacks
-            print(f"Tổng số luồng phân tích: {total}")
-            print(f"Phát hiện luồng bất thường: {attacks} ({attacks/total*100:.2f}%)")
-            print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title="📊 PHÂN BỐ LƯU LƯỢNG MẠNG PHÁT HIỆN")
-            
-    except FileNotFoundError:
-        print("[!] Không thấy mô hình XGBoost đã lưu. Bỏ qua.")
+            if y_test_binary is not None:
+                print(f"Accuracy: {accuracy_score(y_test_binary, preds):.4f}")
+                print(classification_report(y_test_binary, preds, target_names=['Benign', 'Attack'], zero_division=0))
+                print_ascii_confusion_matrix(confusion_matrix(y_test_binary, preds))
+                
+                # Vẽ biểu đồ ASCII phân phối dự đoán
+                attacks = int(sum(preds))
+                benign = len(preds) - attacks
+                print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title=f"📊 PHÂN BỐ LƯU LƯỢNG MẠNG DỰ ĐOÁN ({m_name.upper()})")
+            else:
+                total = len(preds)
+                attacks = int(sum(preds))
+                benign = total - attacks
+                print(f"Tổng số luồng phân tích: {total}")
+                print(f"Phát hiện luồng bất thường: {attacks} ({attacks/total*100:.2f}%)")
+                print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title=f"📊 PHÂN BỐ LƯU LƯỢNG MẠNG PHÁT HIỆN ({m_name.upper()})")
+                
+        except FileNotFoundError:
+            print(f"[!] Không tìm thấy mô hình {m_name} đã lưu. Bỏ qua.")
 
 if __name__ == "__main__":
     main()

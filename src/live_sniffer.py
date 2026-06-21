@@ -215,7 +215,37 @@ class LiveIDSDetector:
 
 
 if __name__ == "__main__":
-    detector = LiveIDSDetector(model_type='rf')
+    print("\n========================================================")
+    print("      🔍 CHỌN MÔ HÌNH HỌC MÁY CHO LIVE SNIFFER 🔍")
+    print("========================================================")
+    models_config = {
+        'rf': 'Random Forest',
+        'xgb': 'XGBoost',
+        'dt': 'Decision Tree',
+        'et': 'Extra Trees',
+        'ada': 'AdaBoost',
+        'gb': 'Gradient Boosting',
+        'knn': 'K-Nearest Neighbors',
+        'lr': 'Logistic Regression',
+        'svm': 'Linear SVM',
+        'nb': 'Naive Bayes'
+    }
+    for idx, (m_type, m_name) in enumerate(models_config.items(), 1):
+        print(f" [{idx}] {m_name} ({m_type})")
+    print("========================================================")
+    
+    choice = input("Nhập lựa chọn của bạn (Mặc định: 1 - Random Forest): ").strip()
+    selected_type = 'rf'
+    if choice:
+        try:
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(models_config):
+                selected_type = list(models_config.keys())[choice_idx]
+        except ValueError:
+            pass
+            
+    print(f"\n[*] Đang khởi tạo bộ dò với mô hình: {models_config[selected_type]}...")
+    detector = LiveIDSDetector(model_type=selected_type)
     try:
         detector.start_sniffing()
     except KeyboardInterrupt:

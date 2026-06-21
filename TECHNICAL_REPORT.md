@@ -5,49 +5,72 @@ Báo cáo này đi sâu vào phân tích toán học, lý thuyết thuật toán
 
 ---
 
-## 1. Lý Thuyết Toán Học & Cơ Chế Thuật Toán của Các Mô Hiện Tại
+## 1. Lý Thuyết Toán Học & Cơ Chế Thuật Toán của Các Mô Hình
 
-Hệ thống IDS hiện tại sử dụng ba thuật toán chính: hai thuật toán học có giám sát (Random Forest, XGBoost) dùng để phát hiện chặn DDoS đã biết và một thuật toán học không giám sát (Isolation Forest) dùng để phát hiện bất thường (Zero-day).
+Hệ thống IDS hiện tại sử dụng 10 thuật toán học máy phân lớp có giám sát để so sánh hiệu năng lọc DDoS, kết hợp với một thuật toán học không giám sát (Isolation Forest) để phát hiện bất thường (Zero-day).
 
 ### 1.1. Random Forest (Rừng Ngẫu Nhiên)
-Random Forest là một phương pháp Ensemble học kết hợp (Bagging - Bootstrap Aggregating). Nó huấn luyện $B$ cây quyết định độc lập trên các mẫu bootstrap khác nhau của tập dữ liệu.
-
-* **Thuật toán phân tách nút (Split Criterion):** Sử dụng chỉ số Gini Impurity (Độ tạp chất Gini) hoặc Entropy để tìm điểm phân tách tối ưu. Đối với chỉ số Gini tại nút $t$ với các lớp $c \in \{0, 1\}$ (Benign vs Attack):
+Random Forest là một phương pháp học máy kết hợp (Bagging - Bootstrap Aggregating). Nó huấn luyện $B$ cây quyết định độc lập trên các mẫu bootstrap khác nhau của tập dữ liệu.
+* **Thuật toán phân tách nút (Split Criterion):** Sử dụng chỉ số Gini Impurity (Độ tạp chất Gini) tại nút $t$ với các lớp $c \in \{0, 1\}$ (Benign vs Attack):
   $$G(t) = 1 - \sum_{c=0}^{1} p_c^2$$
-  Trong đó $p_c$ là tỷ lệ mẫu thuộc lớp $c$ tại nút đó. Thuật toán sẽ tìm thuộc tính $f$ và ngưỡng $\theta$ sao cho độ giảm Gini (Information Gain) là lớn nhất:
-  $$\Delta G = G(t) - \frac{N_{Left}}{N_t} G(t_{Left}) - \frac{N_{Right}}{N_t} G(t_{Right})$$
-* **Giảm phương sai (Variance Reduction):** Bằng cách kết hợp dự đoán của $B$ cây qua cơ chế bỏ phiếu đa số (Majority Voting), Random Forest giảm phương sai tổng thể của mô hình mà không làm tăng độ chệch (bias):
+  Trong đó $p_c$ là tỷ lệ mẫu thuộc lớp $c$ tại nút.
+* **Giảm phương sai (Variance Reduction):** Bằng cách kết hợp dự đoán của nhiều cây qua cơ chế bỏ phiếu đa số, Random Forest giảm phương sai tổng thể của mô hình mà không làm tăng độ chệch (bias):
   $$\text{Var}(\bar{X}) = \rho \sigma^2 + \frac{1-\rho}{B} \sigma^2$$
-  Trong đó $\rho$ là độ tương quan giữa các cây. Việc chọn ngẫu nhiên một tập con đặc trưng (Feature Subsampling) tại mỗi nút phân tách giúp giảm $\rho$, từ đó giảm phương sai mô hình.
+  Trong đó $\rho$ là độ tương quan giữa các cây.
 
 ### 1.2. XGBoost (eXtreme Gradient Boosting)
 XGBoost huấn luyện các cây quyết định tuần tự (boosting) bằng cách tối ưu hóa hàm mục tiêu được xấp xỉ Taylor bậc hai:
-
 * **Hàm mục tiêu được chính quy hóa (Regularized Objective):**
   $$\mathcal{L}^{(t)} = \sum_{i=1}^{n} l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \Omega(f_t)$$
-  Trong đó $\Omega(f) = \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2$ là hàm phạt độ phức tạp của cây (phạt số lượng lá $T$ và trọng số lá $w_j$ để chống overfitting).
+  Trong đó $\Omega(f) = \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2$ là hàm phạt độ phức tạp của cây.
 * **Xấp xỉ Taylor bậc hai (Second-order Taylor Approximation):**
   $$\mathcal{L}^{(t)} \approx \sum_{i=1}^{n} \left[ l(y_i, \hat{y}^{(t-1)}) + g_i f_t(x_i) + \frac{1}{2} h_i f_t^2(x_i) \right] + \Omega(f_t)$$
-  Với $g_i = \partial_{\hat{y}^{(t-1)}} l(y_i, \hat{y}^{(t-1)})$ là gradient bậc nhất và $h_i = \partial^2_{\hat{y}^{(t-1)}} l(y_i, \hat{y}^{(t-1)})$ là gradient bậc hai (Hessian).
-* **Trọng số lá tối ưu (Optimal Leaf Weights):** Trọng số tối ưu $w_j^*$ cho lá $j$ chứa tập con mẫu $I_j$ là:
-  $$w_j^* = -\frac{\sum_{i \in I_j} g_i}{\sum_{i \in I_j} h_i + \lambda}$$
-* **Hàm điểm chia tối ưu (Gain of Split finding):**
-  $$\text{Gain} = \frac{1}{2} \left[ \frac{\left(\sum_{i \in I_L} g_i\right)^2}{\sum_{i \in I_L} h_i + \lambda} + \frac{\left(\sum_{i \in I_R} g_i\right)^2}{\sum_{i \in I_R} h_i + \lambda} - \frac{\left(\sum_{i \in I} g_i\right)^2}{\sum_{i \in I} h_i + \lambda} \right] - \gamma$$
-  XGBoost duyệt qua các đặc trưng để tìm điểm chia có $\text{Gain}$ lớn nhất.
+  Với $g_i$ là gradient bậc nhất và $h_i$ là gradient bậc hai (Hessian).
 
-### 1.3. Isolation Forest (Rừng Cô Lập)
+### 1.3. Decision Tree (Cây Quyết Định)
+Decision Tree phân hoạch không gian dữ liệu đệ quy bằng cách chọn thuộc tính và điểm phân tách tối ưu hóa lượng thông tin thu được (Information Gain):
+$$\text{IG}(T, a) = H(T) - H(T|a)$$
+Cây quyết định đơn lẻ có độ phức tạp thấp, huấn luyện cực nhanh nhưng dễ bị quá khớp (overfitting).
+
+### 1.4. Extra Trees (Cây Cực Hạn Ngẫu Nhiên)
+Khác với Random Forest, Extra Trees (Extremely Randomized Trees) chọn các ngưỡng phân tách ngẫu nhiên hoàn toàn cho từng đặc trưng và chọn điểm phân tách tốt nhất từ các ngưỡng ngẫu nhiên đó. Phép ngẫu nhiên hóa mạnh mẽ này giúp giảm phương sai của mô hình nhiều hơn nữa.
+
+### 1.5. AdaBoost (Adaptive Boosting)
+AdaBoost huấn luyện các bộ phân loại yếu (thường là cây quyết định 1 tầng - Decision Stumps) tuần tự. Trọng số của các mẫu bị phân lớp sai được tăng lên ở mỗi vòng:
+$$w_i^{(t+1)} = w_i^{(t)} \exp(-\alpha_t y_i h_t(x_i))$$
+Trong đó $\alpha_t$ là trọng số của bộ phân loại yếu $h_t$ trong kết quả bỏ phiếu cuối cùng.
+
+### 1.6. Gradient Boosting (Gradient Boosting Machine)
+Gradient Boosting xây dựng các cây tuần tự để xấp xỉ gradient âm (gradient biểu thị sai số) của hàm mất mát đối với giá trị dự đoán trước đó:
+$$F_m(x) = F_{m-1}(x) + \gamma_m h_m(x)$$
+Giúp tối ưu hóa các hàm mất mát phi tuyến phức tạp từng bước một.
+
+### 1.7. K-Nearest Neighbors (KNN - K Láng Giềng Gần Nhất)
+KNN là thuật toán không tham số (non-parametric), gán nhãn cho mẫu chưa biết dựa trên khoảng cách Euclidean tới $K$ mẫu lân cận gần nhất trong tập huấn luyện:
+$$d(x, x') = \sqrt{\sum_{j=1}^{d} (x_j - x_j')^2}$$
+
+### 1.8. Logistic Regression (Hồi Quy Logistic)
+Ước lượng xác suất phân lớp bằng cách sử dụng hàm logistic (sigmoid) trên một tổ hợp tuyến tính các đặc trưng:
+$$P(Y=1|X) = \sigma(W^T X + b) = \frac{1}{1 + e^{-(W^T X + b)}}$$
+Huấn luyện tối thiểu hóa hàm mất mát Binary Cross-Entropy để tìm trọng số tối ưu.
+
+### 1.9. Linear SVM (Máy Vectơ Hỗ Trợ Tuyến Tính)
+SVM tìm siêu phẳng phân lớp tối ưu phân chia hai lớp dữ liệu sao cho khoảng cách (margin) từ siêu phẳng đến các support vectors là lớn nhất:
+$$\min_{W, b} \frac{1}{2} \|W\|^2 + C \sum_{i=1}^N \xi_i$$
+Thỏa mãn điều kiện $y_i(W^T x_i + b) \ge 1 - \xi_i, \xi_i \ge 0$.
+
+### 1.10. Naive Bayes (Phân Lớp Bayes Ngây Thơ)
+Dựa trên định lý Bayes với giả định độc lập có điều kiện giữa tất cả các đặc trưng đầu vào:
+$$P(Y=c|X) \propto P(Y=c) \prod_{j=1}^{d} P(X_j|Y=c)$$
+Với đặc trưng liên tục, phân phối xác suất có điều kiện $P(X_j|Y=c)$ thường được giả định tuân theo phân phối Gaussian.
+
+### 1.11. Isolation Forest (Rừng Cô Lập - Không Giám Sát)
 Isolation Forest hoạt động dựa trên nguyên lý: dị thường (attacks) dễ bị cô lập hơn bình thường (benign) do chúng có giá trị đặc trưng khác biệt.
-
-* **Cơ chế hoạt động:** Tạo ra các cây cô lập ngẫu nhiên (iTrees) bằng cách chọn ngẫu nhiên một đặc trưng và một giá trị phân tách ngẫu nhiên giữa giá trị min và max của đặc trưng đó.
 * **Điểm dị thường (Anomaly Score):**
   $$s(x, n) = 2^{-\frac{\mathbb{E}(h(x))}{c(n)}}$$
-  Trong đó:
-  - $h(x)$ là độ sâu của mẫu $x$ (số cạnh đi từ gốc đến lá chứa $x$).
-  - $\mathbb{E}(h(x))$ là độ sâu trung bình của $x$ qua một tập hợp các cây $iTrees$.
-  - $c(n) = 2 \ln(n - 1) + 0.5772156649 - \frac{2(n - 1)}{n}$ là độ sâu trung bình của một nút trong BST (Binary Search Tree) chứa $n$ phần tử.
-* **Biện giải điểm số:**
-  - Nếu $s \to 1$: độ sâu trung bình rất ngắn $\implies$ mẫu dễ dàng bị cô lập $\implies$ Khả năng cao là cuộc tấn công.
-  - Nếu $s \to 0$: độ sâu trung bình lớn $\implies$ mẫu khó bị cô lập $\implies$ Khả năng cao là lưu lượng an toàn.
+  Trong đó $\mathbb{E}(h(x))$ là độ sâu trung bình của mẫu $x$ qua các cây cô lập ngẫu nhiên (iTrees), và $c(n)$ là độ sâu trung bình của một nút trong BST chứa $n$ phần tử.
+  - Nếu $s \to 1$: mẫu rất dễ cô lập $\implies$ Khả năng cao là cuộc tấn công.
+  - Nếu $s \to 0$: mẫu khó cô lập $\implies$ Khả năng cao là lưu lượng an toàn.
 
 ---
 
@@ -131,56 +154,58 @@ Sau khi căn chỉnh đặc trưng, kết quả dự đoán của các mô hình
 
 ## 4. Kết Quả Kiểm Thử Thực Tế & Phân Tích Quyết Định (Decision Analysis)
 
-Dưới đây là bảng so sánh sâu về mặt toán học giữa hai mô hình giám sát trên tập dữ liệu kiểm thử 50,000 dòng:
+Dưới đây là bảng so sánh sâu về mặt toán học giữa 10 mô hình giám sát trên tập dữ liệu kiểm thử quy mô lớn 50,000 dòng (chứa các cuộc tấn công DDoS phức tạp và lưu lượng khách hàng gây nhiễu):
 
 ### 4.1. Ma Trận Đánh Giá Toán Học (Evaluation Metrics)
 
-| Chỉ số đánh giá | Công thức toán học | Random Forest | XGBoost | Ý nghĩa thực tế |
-| :--- | :--- | :---: | :---: | :--- |
-| **Accuracy (Độ chính xác)** | $\frac{TP + TN}{TP + TN + FP + FN}$ | 71.23% | 98.61% | Tỷ lệ dự đoán đúng trên toàn bộ tập dữ liệu. |
-| **DDoS Recall (Độ phủ)** | $\frac{TP}{TP + FN}$ | **64.04%** | **98.32%** | Khả năng chặn đứng cuộc tấn công DDoS. XGBoost đạt hiệu năng cực tốt. |
-| **Benign Recall (Availability)** | $\frac{TN}{TN + FP}$ | **100.00%** | **99.75%** | Tỷ lệ chừa đường cho khách hàng hợp lệ (Availability). |
-| **DDoS Precision (Độ chuẩn xác)** | $\frac{TP}{TP + FP}$ | 100.00% | 99.94% | Trong số những luồng bị cảnh báo độc hại, bao nhiêu phần trăm là tấn công thật. |
+| Mô hình | Mô tả cơ chế phân lớp | Accuracy (Chính xác) | DDoS Recall (Bảo mật) | Khách Sẵn sàng (Availability) |
+| :--- | :--- | :---: | :---: | :---: |
+| **XGBoost** | Tối ưu hóa gradient bậc hai | **99.11%** | **99.68%** | 96.81% |
+| **AdaBoost** | Học tăng cường thích ứng | **97.24%** | 96.88% | 98.69% |
+| **Naive Bayes** | Phân lớp xác suất Bayes | 96.40% | 99.27% | 84.93% |
+| **Linear SVM** | Siêu phẳng phân lớp tối đa hóa lề | 92.11% | 91.66% | 93.91% |
+| **Logistic Regression** | Hàm Sigmoid tối ưu cross-entropy | 88.88% | 87.43% | 94.68% |
+| **Extra Trees** | Cực hạn ngẫu nhiên hóa điểm phân tách | 87.46% | 84.34% | **99.97%** |
+| **Random Forest** | Biểu quyết rừng cây độc lập | 79.07% | 73.84% | **99.99%** |
+| **Gradient Boosting** | Tối ưu hóa gradient bậc nhất | 78.95% | 73.80% | 99.55% |
+| **K-Nearest Neighbors**| Khoảng cách không gian láng giềng | 77.13% | 76.57% | 79.40% |
+| **Decision Tree** | Một cây quyết định đơn lẻ | 67.69% | 74.44% | 40.68% |
 
-### 4.2. So sánh Không gian Quyết định (Decision Boundaries)
+### 4.2. Phân Tích Quyết Định & Ranh Giới Quyết Định (Decision Boundaries)
 
-```
-        Fwd Packet Length Max
-          ▲
-          │
-          │       Vùng phân loại BENIGN
-          │       (Yêu cầu lớn, nhiều dữ liệu)
-          ├─────────────────────────┐
-          │                         │
-          │                         │
-  14.8 B  ├───────┐                 │
-          │  DDoS │                 │
-          │ (RF)  │  DDoS (XGBoost) │
-          └───────┴─────────────────┴────────► Flow Duration
-                  5.0 s            25.0 s
-```
+1. **Nhóm Boosting ưu tú (XGBoost, AdaBoost):**
+   * Đạt hiệu năng lọc DDoS tốt nhất nhờ cơ chế tối ưu hóa sai số tích lũy tuần tự. XGBoost lọc sạch 99.68% DDoS, ngăn chặn tối đa sự cố sập máy chủ.
+   * Biên quyết định của nhóm này cực kỳ linh hoạt (Smooth decision boundaries). Đổi lại, chúng lấn nhẹ sang dải phân phối của khách hàng, gây ra tỷ lệ chặn nhầm khách hàng từ 1.31% đến 3.19%.
 
-* **Random Forest:** Tạo ra biên quyết định dạng hình hộp trực giao (Axis-aligned hyperplanes). Nó có xu hướng bảo thủ hơn đối với lớp thiểu số khi dữ liệu dịch chuyển, dẫn đến việc không chặn nhầm khách hàng nào ($FP=0$), nhưng bỏ sót rất nhiều luồng DDoS ($FN = 14,384$, chỉ đạt tỷ lệ chặn 64.04% do các gói DDoS nâng cao có dung lượng lớn lọt lưới).
-* **XGBoost:** Học các cây quyết định tuần tự dựa trên việc tối ưu hóa độ dốc (gradient descent). Biên quyết định của nó linh hoạt và mượt mà hơn (Smooth decision boundaries). XGBoost tối ưu hóa cực tốt lớp Attack, chỉ bỏ sót 672 luồng ($FN=672$ $\implies$ Recall=98.32%), đổi lại biên quyết định của nó lấn nhẹ sang vùng Benign (gây ra $FP=25$ hay chặn nhầm 25 khách).
+2. **Nhóm Bagging bảo thủ (Random Forest, Extra Trees):**
+   * Đạt điểm tuyệt đối trong việc bảo vệ khách hàng (TNR đạt 99.99% và 99.97%). Điều này có nghĩa khách hàng hầu như không bao giờ bị chặn nhầm.
+   * Lý do: các mô hình này biểu quyết trung bình từ nhiều cây độc lập, nên ranh giới quyết định rất an toàn cho lớp đa số (Benign). Mặt trái là chúng bỏ sót nhiều cuộc tấn công DDoS ngụy trang tinh vi (Recall chỉ đạt 73.84% và 84.34%).
 
-### 4.3. Biểu đồ Phân tích Toán học Trực quan (Matplotlib rendering)
+3. **Nhóm Phân lớp Tuyến tính & Xác suất (Linear SVM, Logistic Regression, Naive Bayes):**
+   * Naive Bayes có Recall DDoS cao (99.27%) nhưng làm sụt giảm nghiêm trọng tính sẵn sàng của máy chủ khi chặn nhầm 15.07% khách hàng do giả định các biến độc lập không phản ánh đúng mối tương quan thực tế của lưu lượng mạng.
+   * Linear SVM và Logistic Regression đạt hiệu năng cân bằng khá tốt (~88% - 92% accuracy) nhưng không thể so sánh với XGBoost/AdaBoost do biên quyết định bị giới hạn bởi tính tuyến tính.
+
+4. **Cây Quyết định đơn lẻ (Decision Tree):**
+   * Hiệu năng thấp nhất (Accuracy 67.69%, TNR 40.68%). Cây đơn lẻ bị quá khớp nặng nề và cực kỳ nhạy cảm với các biến đổi nhiễu ngẫu nhiên trong luồng mạng thực tế.
+
+### 4.3. Biểu Đồ Phân Tích Toán Học Trực Quan (Matplotlib Rendering)
 
 Dưới đây là các biểu đồ phân tích trực quan được vẽ trực tiếp bằng thư viện `matplotlib` và `seaborn` từ kết quả thực thi kiểm thử 50,000 dòng dữ liệu:
 
 #### A. Heatmaps Ma Trận Nhầm Lẫn (Confusion Matrices)
-Bộ biểu đồ nhiệt thể hiện sự nhầm lẫn giữa luồng khách hàng và luồng tấn công. Bạn có thể mở ảnh gốc tại: `data/external/confusion_matrices.png`.
+Bộ biểu đồ nhiệt thể hiện sự nhầm lẫn giữa luồng khách hàng và luồng tấn công của cả 10 mô hình. Bạn có thể mở ảnh gốc tại: `data/external/confusion_matrices.png`.
 
-![Ma trận nhầm lẫn dạng Heatmap của Random Forest và XGBoost](data/external/confusion_matrices.png)
+![Ma trận nhầm lẫn dạng Heatmap của 10 mô hình học máy](data/external/confusion_matrices.png)
 
 #### B. Các Đường Cong Hiệu Năng & Không Gian Quyết Định
 Bộ đồ thị 4 bảng bao gồm:
-1. **Đường cong ROC:** Thể hiện độ nhạy đối chiếu với tỷ lệ báo động giả (False Alarm Rate).
-2. **Đường cong Precision-Recall:** Thể hiện độ chính xác lọc tấn công.
-3. **Đồ thị Trade-off (Đánh đổi):** Chỉ ra ngưỡng quyết định tối ưu để bảo vệ an toàn tối đa mà vẫn giữ mức Availability tốt nhất cho khách hàng.
-4. **Không gian Quyết định 2D:** Biểu diễn trực quan tập dữ liệu 50,000 dòng phân bố theo 2 biến quan trọng nhất.
+1. **Đường cong ROC:** So sánh đường cong ROC và AUC của toàn bộ 10 mô hình.
+2. **Đường cong Precision-Recall:** So sánh khả năng phát hiện/chặn DDoS và độ chính xác của 10 mô hình.
+3. **Đồ thị Trade-off (Đánh đổi):** Chỉ ra ngưỡng quyết định tối ưu đối với mô hình tốt nhất (XGBoost) để cân bằng Bảo mật vs Tính sẵn sàng.
+4. **Không gian Quyết định 2D:** Biểu diễn trực quan tập dữ liệu 50,000 dòng thực tế phân bố theo 2 thuộc tính quan trọng nhất: Flow Duration và Fwd Packet Length Max.
 Bạn có thể mở ảnh gốc tại: `data/external/availability_comparison.png`.
 
-![Đồ thị ROC, Precision-Recall, Trade-off Bảo mật vs Tính sẵn sàng và Ranh giới Quyết định 2D](data/external/availability_comparison.png)
+![Đồ thị ROC, Precision-Recall, Trade-off Bảo mật vs Tính sẵn sàng và Ranh giới Quyết định 2D cho 10 mô hình](data/external/availability_comparison.png)
 
 ---
 

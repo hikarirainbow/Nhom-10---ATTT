@@ -53,6 +53,47 @@ XGB_PARAMS = {
     'n_jobs': -1
 }
 
+DT_PARAMS = {
+    'max_depth': 12,
+    'random_state': 42
+}
+
+ET_PARAMS = {
+    'n_estimators': 100,
+    'max_depth': 15,
+    'random_state': 42,
+    'n_jobs': -1
+}
+
+ADA_PARAMS = {
+    'n_estimators': 50,
+    'random_state': 42
+}
+
+GB_PARAMS = {
+    'n_estimators': 50,
+    'learning_rate': 0.1,
+    'max_depth': 5,
+    'random_state': 42
+}
+
+KNN_PARAMS = {
+    'n_neighbors': 5,
+    'n_jobs': -1
+}
+
+LR_PARAMS = {
+    'max_iter': 1000,
+    'random_state': 42
+}
+
+SVM_PARAMS = {
+    'max_iter': 1000,
+    'random_state': 42
+}
+
+NB_PARAMS = {}
+
 # --- SNIFFER CONFIGURATION ---
 # Cấu hình cho live capture
 SNIFF_INTERFACE = None  # None nghĩa là tự động chọn card mạng mặc định

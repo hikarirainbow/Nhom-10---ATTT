@@ -1,9 +1,15 @@
 import os
 import joblib
-from sklearn.ensemble import RandomForestClassifier
+import numpy as np
+import sys
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import IsolationForest
 import xgboost as xgb
-import sys
 
 # Đảm bảo import được config từ thư mục gốc
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,6 +44,22 @@ class IDSSupervisedModel:
                 print("[💻 CPU] Không phát hiện CUDA hoặc driver không tương thích. Chạy XGBoost bằng CPU.")
                 
             self.model = xgb.XGBClassifier(**params)
+        elif self.model_type == 'dt':
+            self.model = DecisionTreeClassifier(**config.DT_PARAMS)
+        elif self.model_type == 'et':
+            self.model = ExtraTreesClassifier(**config.ET_PARAMS)
+        elif self.model_type == 'ada':
+            self.model = AdaBoostClassifier(**config.ADA_PARAMS)
+        elif self.model_type == 'gb':
+            self.model = GradientBoostingClassifier(**config.GB_PARAMS)
+        elif self.model_type == 'knn':
+            self.model = KNeighborsClassifier(**config.KNN_PARAMS)
+        elif self.model_type == 'lr':
+            self.model = LogisticRegression(**config.LR_PARAMS)
+        elif self.model_type == 'svm':
+            self.model = LinearSVC(**config.SVM_PARAMS)
+        elif self.model_type == 'nb':
+            self.model = GaussianNB(**config.NB_PARAMS)
         else:
             raise ValueError(f"Không hỗ trợ mô hình học máy: {self.model_type}")
         print(f"[+] Khởi tạo thành công mô hình: {self.model_type}")
@@ -53,7 +75,13 @@ class IDSSupervisedModel:
     def predict_proba(self, X):
         if hasattr(self.model, "predict_proba"):
             return self.model.predict_proba(X)[:, 1]
-        return self.model.predict(X)
+        elif hasattr(self.model, "decision_function"):
+            df = self.model.decision_function(X)
+            # Dùng Sigmoid để đưa về miền [0, 1]
+            return 1 / (1 + np.exp(-df))
+        else:
+            # Fallback nếu không có cả hai (ví dụ một số mô hình không chuẩn hóa)
+            return self.model.predict(X)
 
     def save(self):
         joblib.dump(self.model, self.model_path)

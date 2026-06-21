@@ -23,10 +23,9 @@ def print_menu():
     print(" [2] Huấn luyện Mô hình & So sánh Thuật toán (train.py)")
     print(" [3] Kiểm thử chéo với Dataset bên ngoài (.csv) (evaluate.py)")
     print(" [4] Chạy sniffer mạng trực tiếp trên Máy tính (live_sniffer.py)")
-    print(" [5] Khởi chạy Giao diện Dashboard Trực quan (Streamlit)")
+    print(" [5] Mô phỏng & Đánh giá Tính Sẵn sàng Máy chủ (DDoS vs Khách) (run_availability_test.py)")
     print(" [6] Đọc Tài liệu Hướng dẫn (README.md)")
-    print(" [7] Mô phỏng & Đánh giá Tính Sẵn sàng Máy chủ (DDoS vs Khách) (run_availability_test.py)")
-    print(" [8] Thoát")
+    print(" [7] Thoát")
     print("========================================================================")
 
 def run_command(command):
@@ -45,7 +44,7 @@ def main():
         clear_screen()
         print_banner()
         print_menu()
-        choice = input("Nhập lựa chọn của bạn (1-8): ").strip()
+        choice = input("Nhập lựa chọn của bạn (1-7): ").strip()
         
         if choice == '1':
             run_command("pip install -r requirements.txt")
@@ -66,7 +65,7 @@ def main():
             if confirm == 'y':
                 run_command("python src/live_sniffer.py")
         elif choice == '5':
-            run_command("streamlit run src/dashboard.py")
+            run_command("python src/run_availability_test.py")
         elif choice == '6':
             readme_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "README.md")
             if os.path.exists(readme_path):
@@ -79,8 +78,6 @@ def main():
                 print("[!] File README.md không tồn tại.")
                 input("\nNhấn Enter để quay lại...")
         elif choice == '7':
-            run_command("python src/run_availability_test.py")
-        elif choice == '8':
             print("\nCảm ơn bạn đã sử dụng chương trình. Tạm biệt!")
             break
         else:
