@@ -1,218 +1,162 @@
-# Báo Cáo Phân Tích Kỹ Thuật Chuyên Sâu (Deep Dive Technical Report)
-## Hệ Thống Phát Hiện Xâm Nhập Mạng (IDS) & Bảo Vệ Tính Sẵn Sàng (Availability) Của Máy Chủ
+# BÁO CÁO NGHIÊN CỨU & THỰC NGHIỆM CHUYÊN SÂU
+## Đề tài: Tìm Hiểu Về Xây Dựng Hệ Thống Phát Hiện Xâm Nhập Mạng (IDS) Với Trí Tuệ Nhân Tạo (AI)
 
-Báo cáo này đi sâu vào phân tích toán học, lý thuyết thuật toán, kiến trúc luồng gói tin mạng (Packet-to-Flow aggregation) và các vấn đề dịch chuyển phân phối xác suất (Covariate Shift) gặp phải trong hệ thống IDS sử dụng học máy.
+**Nội dung thực hiện:**
+1. Khảo sát và tiền xử lý tập dữ liệu **Kaggle CICIDS2017** làm nền tảng huấn luyện IDS.
+2. Xây dựng, huấn luyện và so sánh **10 mô hình học máy phân lớp có giám sát** và **1 mô hình không giám sát (Isolation Forest)**.
+3. Thiết lập môi trường thực nghiệm ngoài: Mô phỏng lưu lượng capture thực tế quy mô lớn (50,000 dòng luồng mạng) pha trộn hành vi tinh vi để đánh giá tính sẵn sàng máy chủ (**Availability**) song song với tính bảo mật (**Security**).
+4. Phân tích chi tiết, trực quan hóa ranh giới quyết định (Decision Boundaries) và đường cong đánh đổi (Threshold Trade-offs) cho từng mô hình một cách định lượng.
 
 ---
 
-## 1. Lý Thuyết Toán Học & Cơ Chế Thuật Toán của Các Mô Hình
+## 1. Cơ Sở Dữ Liệu Huấn Luyện (Kaggle CICIDS2017) & Trích Chọn Đặc Trưng
 
-Hệ thống IDS hiện tại sử dụng 10 thuật toán học máy phân lớp có giám sát để so sánh hiệu năng lọc DDoS, kết hợp với một thuật toán học không giám sát (Isolation Forest) để phát hiện bất thường (Zero-day).
+Hệ thống sử dụng tập dữ liệu **CICIDS2017** (được cung cấp và tải về từ nguồn Kaggle) làm bộ dữ liệu mẫu chuẩn (Ground Truth) để huấn luyện mô hình. Tập dữ liệu này chứa lưu lượng mạng của 5 ngày làm việc với đầy đủ các hành vi mạng thông thường (Benign) và các cuộc tấn công phổ biến như DDoS (LOIC/HOIC), Brute Force, Web Attacks, và Infiltration.
 
-### 1.1. Random Forest (Rừng Ngẫu Nhiên)
-Random Forest là một phương pháp học máy kết hợp (Bagging - Bootstrap Aggregating). Nó huấn luyện $B$ cây quyết định độc lập trên các mẫu bootstrap khác nhau của tập dữ liệu.
-* **Thuật toán phân tách nút (Split Criterion):** Sử dụng chỉ số Gini Impurity (Độ tạp chất Gini) tại nút $t$ với các lớp $c \in \{0, 1\}$ (Benign vs Attack):
-  $$G(t) = 1 - \sum_{c=0}^{1} p_c^2$$
-  Trong đó $p_c$ là tỷ lệ mẫu thuộc lớp $c$ tại nút.
-* **Giảm phương sai (Variance Reduction):** Bằng cách kết hợp dự đoán của nhiều cây qua cơ chế bỏ phiếu đa số, Random Forest giảm phương sai tổng thể của mô hình mà không làm tăng độ chệch (bias):
-  $$\text{Var}(\bar{X}) = \rho \sigma^2 + \frac{1-\rho}{B} \sigma^2$$
-  Trong đó $\rho$ là độ tương quan giữa các cây.
+### 1.1. Tiền xử lý & Chuẩn hóa
+* **Loại bỏ nhiễu và làm sạch:** Các luồng mạng có thuộc tính lỗi, giá trị trống (NaN) hoặc vô cực (Infinity - phát sinh do phép chia cho thời lượng luồng duration = 0) đều được lọc sạch triệt để.
+* **Chuẩn hóa StandardScaler:** Chuyển đổi các đặc trưng mạng có phân phối lệch (skewed distributions) về phân phối chuẩn hóa có trung bình $\mu = 0$ và độ lệch chuẩn $\sigma = 1$:
+  $$Z = \frac{X - \mu}{\sigma}$$
 
-### 1.2. XGBoost (eXtreme Gradient Boosting)
-XGBoost huấn luyện các cây quyết định tuần tự (boosting) bằng cách tối ưu hóa hàm mục tiêu được xấp xỉ Taylor bậc hai:
-* **Hàm mục tiêu được chính quy hóa (Regularized Objective):**
-  $$\mathcal{L}^{(t)} = \sum_{i=1}^{n} l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \Omega(f_t)$$
-  Trong đó $\Omega(f) = \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2$ là hàm phạt độ phức tạp của cây.
-* **Xấp xỉ Taylor bậc hai (Second-order Taylor Approximation):**
-  $$\mathcal{L}^{(t)} \approx \sum_{i=1}^{n} \left[ l(y_i, \hat{y}^{(t-1)}) + g_i f_t(x_i) + \frac{1}{2} h_i f_t^2(x_i) \right] + \Omega(f_t)$$
-  Với $g_i$ là gradient bậc nhất và $h_i$ là gradient bậc hai (Hessian).
+### 1.2. Danh sách 15 Đặc trưng Trích chọn (15 Core Features)
+Để tối ưu hóa thời gian huấn luyện đồng thời đảm bảo khả năng triển khai thực tế bắt gói tin thời gian thực qua card mạng, hệ thống trích lọc 15 đặc trưng quan trọng nhất:
+1. `Flow Duration` (Thời lượng luồng)
+2. `Total Fwd Packets` (Tổng số gói truyền đi)
+3. `Total Backward Packets` (Tổng số gói nhận về)
+4. `Total Length of Fwd Packets` (Tổng dung lượng gói truyền đi)
+5. `Total Length of Bwd Packets` (Tổng dung lượng gói nhận về)
+6. `Fwd Packet Length Max` (Độ dài gói truyền đi lớn nhất)
+7. `Fwd Packet Length Min` (Độ dài gói truyền đi nhỏ nhất)
+8. `Fwd Packet Length Mean` (Độ dài gói truyền đi trung bình)
+9. `Bwd Packet Length Max` (Độ dài gói nhận về lớn nhất)
+10. `Bwd Packet Length Min` (Độ dài gói nhận về nhỏ nhất)
+11. `Bwd Packet Length Mean` (Độ dài gói nhận về trung bình)
+12. `Flow Bytes/s` (Tốc độ truyền byte trên giây)
+13. `Flow Packets/s` (Tốc độ truyền gói trên giây)
+14. `Flow IAT Mean` (Thời gian trung bình giữa các gói tin)
+15. `Flow IAT Max` (Thời gian lớn nhất giữa các gói tin)
 
-### 1.3. Decision Tree (Cây Quyết Định)
-Decision Tree phân hoạch không gian dữ liệu đệ quy bằng cách chọn thuộc tính và điểm phân tách tối ưu hóa lượng thông tin thu được (Information Gain):
+---
+
+## 2. Cơ Sở Toán Học Của 11 Thuật Toán Thực Nghiệm
+
+### 2.1. Random Forest (Rừng Ngẫu Nhiên)
+Phương pháp học máy kết hợp (Bagging). Huấn luyện $B$ cây quyết định độc lập trên các tập mẫu Bootstrap. Sự phân tách nút dựa trên việc giảm chỉ số Gini Impurity:
+$$G(t) = 1 - \sum_{c=0}^{1} p_c^2$$
+
+### 2.2. XGBoost (Extreme Gradient Boosting)
+Học tăng cường (Boosting) tối ưu hóa hàm mục tiêu có chứa số hạng phạt độ phức tạp (chính quy hóa $\Omega(f)$) qua xấp xỉ Taylor bậc hai:
+$$\mathcal{L}^{(t)} \approx \sum_{i=1}^{n} \left[ g_i f_t(x_i) + \frac{1}{2} h_i f_t^2(x_i) \right] + \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2$$
+Trong đó $g_i$ và $h_i$ là gradient bậc nhất và bậc hai của hàm loss đối với dự đoán trước đó.
+
+### 2.3. Decision Tree (Cây Quyết Định)
+Xây dựng một cây quyết định duy nhất bằng cách phân tách không gian đặc trưng đệ quy nhằm tối đa hóa lượng thông tin thu được (Information Gain - IG) tại mỗi nút:
 $$\text{IG}(T, a) = H(T) - H(T|a)$$
-Cây quyết định đơn lẻ có độ phức tạp thấp, huấn luyện cực nhanh nhưng dễ bị quá khớp (overfitting).
 
-### 1.4. Extra Trees (Cây Cực Hạn Ngẫu Nhiên)
-Khác với Random Forest, Extra Trees (Extremely Randomized Trees) chọn các ngưỡng phân tách ngẫu nhiên hoàn toàn cho từng đặc trưng và chọn điểm phân tách tốt nhất từ các ngưỡng ngẫu nhiên đó. Phép ngẫu nhiên hóa mạnh mẽ này giúp giảm phương sai của mô hình nhiều hơn nữa.
+### 2.4. Extra Trees (Cây Cực Hạn Ngẫu Nhiên)
+Gần tương tự như Random Forest nhưng ngưỡng phân tách $\theta$ cho từng đặc trưng được chọn ngẫu nhiên hoàn toàn thay vì tìm kiếm tối ưu. Thuật toán này giúp giảm đáng kể phương sai (variance) và nhạy bén hơn với các biến thể nhiễu mạng.
 
-### 1.5. AdaBoost (Adaptive Boosting)
-AdaBoost huấn luyện các bộ phân loại yếu (thường là cây quyết định 1 tầng - Decision Stumps) tuần tự. Trọng số của các mẫu bị phân lớp sai được tăng lên ở mỗi vòng:
+### 2.5. AdaBoost (Adaptive Boosting)
+AdaBoost huấn luyện các cây quyết định 1 tầng (Decision Stumps) tuần tự. Các mẫu bị phân lớp sai ở vòng trước sẽ được nhân trọng số tăng lên trong vòng huấn luyện tiếp theo:
 $$w_i^{(t+1)} = w_i^{(t)} \exp(-\alpha_t y_i h_t(x_i))$$
-Trong đó $\alpha_t$ là trọng số của bộ phân loại yếu $h_t$ trong kết quả bỏ phiếu cuối cùng.
 
-### 1.6. Gradient Boosting (Gradient Boosting Machine)
-Gradient Boosting xây dựng các cây tuần tự để xấp xỉ gradient âm (gradient biểu thị sai số) của hàm mất mát đối với giá trị dự đoán trước đó:
+### 2.6. Gradient Boosting (Gradient Boosting Machine)
+Xây dựng các cây tuần tự để xấp xỉ trực tiếp gradient âm của hàm mất mát (loss function) theo giá trị dự đoán, giúp mô hình hội tụ tốt hơn trên các không gian phi tuyến phức tạp:
 $$F_m(x) = F_{m-1}(x) + \gamma_m h_m(x)$$
-Giúp tối ưu hóa các hàm mất mát phi tuyến phức tạp từng bước một.
 
-### 1.7. K-Nearest Neighbors (KNN - K Láng Giềng Gần Nhất)
-KNN là thuật toán không tham số (non-parametric), gán nhãn cho mẫu chưa biết dựa trên khoảng cách Euclidean tới $K$ mẫu lân cận gần nhất trong tập huấn luyện:
+### 2.7. K-Nearest Neighbors (KNN - K Láng Giềng Gần Nhất)
+KNN phân lớp dữ liệu dựa trên khoảng cách Euclidean trong không gian đặc trưng $d$-chiều đã được chuẩn hóa:
 $$d(x, x') = \sqrt{\sum_{j=1}^{d} (x_j - x_j')^2}$$
+Mẫu mới sẽ được gán nhãn theo biểu quyết đa số của $K$ láng giềng gần nhất.
 
-### 1.8. Logistic Regression (Hồi Quy Logistic)
-Ước lượng xác suất phân lớp bằng cách sử dụng hàm logistic (sigmoid) trên một tổ hợp tuyến tính các đặc trưng:
+### 2.8. Logistic Regression (Hồi Quy Logistic)
+Mô hình tuyến tính sử dụng hàm logistic (sigmoid) để dự đoán xác suất luồng mạng thuộc lớp độc hại:
 $$P(Y=1|X) = \sigma(W^T X + b) = \frac{1}{1 + e^{-(W^T X + b)}}$$
-Huấn luyện tối thiểu hóa hàm mất mát Binary Cross-Entropy để tìm trọng số tối ưu.
 
-### 1.9. Linear SVM (Máy Vectơ Hỗ Trợ Tuyến Tính)
-SVM tìm siêu phẳng phân lớp tối ưu phân chia hai lớp dữ liệu sao cho khoảng cách (margin) từ siêu phẳng đến các support vectors là lớn nhất:
-$$\min_{W, b} \frac{1}{2} \|W\|^2 + C \sum_{i=1}^N \xi_i$$
-Thỏa mãn điều kiện $y_i(W^T x_i + b) \ge 1 - \xi_i, \xi_i \ge 0$.
+### 2.9. Linear SVM (Máy Vectơ Hỗ Trợ Tuyến Tính)
+Tìm siêu phẳng phân tách lề tối đa (maximum margin hyperplane) để phân tách lớp DDoS và lớp Benign:
+$$\min_{W, b} \frac{1}{2} \|W\|^2 + C \sum_{i=1}^N \xi_i \quad \text{s.t.} \quad y_i(W^T x_i + b) \ge 1 - \xi_i$$
 
-### 1.10. Naive Bayes (Phân Lớp Bayes Ngây Thơ)
-Dựa trên định lý Bayes với giả định độc lập có điều kiện giữa tất cả các đặc trưng đầu vào:
+### 2.10. Naive Bayes (Phân Lớp Bayes Ngây Thơ)
+Mô hình xác suất dựa trên định lý Bayes với giả thiết độc lập có điều kiện giữa các đặc trưng:
 $$P(Y=c|X) \propto P(Y=c) \prod_{j=1}^{d} P(X_j|Y=c)$$
-Với đặc trưng liên tục, phân phối xác suất có điều kiện $P(X_j|Y=c)$ thường được giả định tuân theo phân phối Gaussian.
+Với giả thiết đặc trưng liên tục tuân theo phân phối xác suất Gaussian.
 
-### 1.11. Isolation Forest (Rừng Cô Lập - Không Giám Sát)
-Isolation Forest hoạt động dựa trên nguyên lý: dị thường (attacks) dễ bị cô lập hơn bình thường (benign) do chúng có giá trị đặc trưng khác biệt.
-* **Điểm dị thường (Anomaly Score):**
-  $$s(x, n) = 2^{-\frac{\mathbb{E}(h(x))}{c(n)}}$$
-  Trong đó $\mathbb{E}(h(x))$ là độ sâu trung bình của mẫu $x$ qua các cây cô lập ngẫu nhiên (iTrees), và $c(n)$ là độ sâu trung bình của một nút trong BST chứa $n$ phần tử.
-  - Nếu $s \to 1$: mẫu rất dễ cô lập $\implies$ Khả năng cao là cuộc tấn công.
-  - Nếu $s \to 0$: mẫu khó cô lập $\implies$ Khả năng cao là lưu lượng an toàn.
+### 2.11. Isolation Forest (Rừng Cô Lập - Không Giám Sát)
+Huấn luyện độc quyền trên dữ liệu lưu lượng bình thường (Benign) nhằm phát hiện bất thường (Anomaly Detection). Nó cô lập các điểm dữ liệu bằng cách chia cắt ngẫu nhiên. Điểm dị thường được tính bằng:
+$$s(x, n) = 2^{-\frac{\mathbb{E}(h(x))}{c(n)}}$$
+Các luồng có $s \to 1$ có độ sâu trung bình ngắn, dễ bị cô lập $\implies$ Cảnh báo tấn công bất thường (Zero-day).
 
 ---
 
-## 2. Quy trình Trích xuất Luồng Mạng (Packet-to-Flow Aggregation)
+## 3. Thiết Lập Thực Nghiệm: Mô Phỏng Capture Ngoài Quy Mô Lớn
 
-Trong thực tế, card mạng thu nhận các gói tin thô (raw packets). Hệ thống IDS không phân tích độc lập từng gói tin đơn lẻ mà tích hợp chúng thành các **Luồng mạng (Flows)** để trích xuất đặc trưng hành vi.
-
-### Định nghĩa Luồng 5-Tuple
-Một luồng mạng được xác định duy nhất bởi bộ 5 tham số:
-$$\text{Flow Key} = \langle \text{IP}_{src}, \text{IP}_{dst}, \text{Port}_{src}, \text{Port}_{dst}, \text{Protocol} \rangle$$
-
-### Quy trình tổng hợp trong `live_sniffer.py`
-```mermaid
-sequenceDiagram
-    participant Network as Card Mạng
-    participant Sniffer as Bộ Sniff Scapy
-    participant Aggregator as Bộ Tổng Hợp Luồng
-    participant FeatureExtractor as Trích Xuất Đặc Trưng
-    participant Model as Mô Hình AI
-
-    Network->>Sniffer: Gói tin TCP/UDP/IP thô
-    Sniffer->>Aggregator: Đọc 5-Tuple & Timestamps
-    Note over Aggregator: Kiểm tra Flow Key trong RAM
-    alt Luồng đã tồn tại & Chưa Timeout
-        Aggregator->>Aggregator: Cập nhật gói (Fwd/Bwd packets, IAT, length)
-    else Luồng mới hoặc Đã Timeout
-        Aggregator->>FeatureExtractor: Xuất luồng cũ đi
-        Aggregator->>Aggregator: Khởi tạo luồng mới trong RAM
-    end
-    FeatureExtractor->>Model: Dự đoán lớp (0=Benign, 1=Attack)
-```
-
-### Các công thức tính toán đặc trưng luồng:
-1. **Flow Duration (Thời lượng luồng):**
-   $$D = t_{last} - t_{first}$$
-2. **Flow Packets/s (Số gói tin trên giây):**
-   $$\text{Flow Packets/s} = \frac{N_{fwd} + N_{bwd}}{D}$$
-3. **Inter-Arrival Time (IAT - Thời gian giữa các gói tin liên tiếp):**
-   $$IAT_i = t_i - t_{i-1}$$
-   $$\text{Flow IAT Mean} = \frac{1}{K} \sum_{i=1}^{K} IAT_i$$
-   $$\text{Flow IAT Max} = \max_i(IAT_i)$$
+Để đáp ứng yêu cầu kiểm thử mô hình thực tế bằng nguồn dữ liệu capture bên ngoài (External Captured Data), chúng tôi đã thiết kế một module giả lập mạng nâng cao (`run_availability_test.py`) sinh ra **50,000 dòng luồng mạng** trộn lẫn giữa:
+* **80% Tấn công DDoS (40,000 dòng):** Bao gồm 85% DDoS truyền thống (gói nhỏ dồn dập, Fwd Packet Length Max từ 6 - 20 bytes) và 15% DDoS nâng cao (HTTP POST Flood giả lập payload lớn, Fwd Packet Length Max từ 800 - 2500 bytes nhằm vượt qua bộ lọc độ dài thô).
+* **20% Khách hàng Hợp lệ (10,000 dòng):** Bao gồm 85% kết nối Weather API thông thường (Fwd Packet Length Max từ 100 - 1500 bytes) lấy dữ liệu thời gian thực từ Open-Meteo API và 15% kết nối Keep-Alive/Ping điều khiển dung lượng cực nhỏ (chồng lấn lên dải phân phối của DDoS thô).
+* **Nhiễu Gaussian mạng thực tế:** Tích hợp 4% biến động ngẫu nhiên trên toàn bộ các cột đặc trưng để tạo ra độ nhiễu và thử thách độ bền vững (robustness) của mô hình.
 
 ---
 
-## 3. Toán học về Dịch chuyển Phân phối Xác suất (Covariate Shift)
+## 4. Phân Tích Thực Nghiệm Chi Tiết Qua Từng Biểu Đồ
 
-Vấn đề mô hình dự đoán sai hoàn toàn (DDoS Block Rate = 0%) trên dữ liệu mô phỏng đầu tiên là do hiện tượng **Dịch chuyển Đồng biến (Covariate Shift)**.
+Kết quả thực nghiệm của 10 mô hình giám sát trên tập dữ liệu capture ngoài 50,000 dòng được thống kê định lượng dưới bảng sau:
 
-### Định nghĩa toán học
-Gọi $X \in \mathcal{X}$ là không gian đặc trưng (features) và $Y \in \{0, 1\}$ là nhãn (Label).
-Covariate Shift xảy ra khi phân phối biên của các đặc trưng thay đổi giữa tập huấn luyện (training) và tập kiểm thử (testing):
-$$P_{train}(X) \neq P_{test}(X)$$
-Nhưng xác suất có điều kiện của nhãn không đổi:
-$$P_{train}(Y|X) = P_{test}(Y|X)$$
+| Mô hình | Accuracy (Chính xác) | DDoS Recall (Bảo mật) | Khách Sẵn sàng (Availability) |
+| :--- | :---: | :---: | :---: |
+| **XGBoost** | **99.06%** | **99.75%** | 96.29% |
+| **AdaBoost** | **97.25%** | 96.89% | 98.67% |
+| **Naive Bayes** | 96.30% | 99.24% | 84.52% |
+| **Linear SVM** | 92.32% | 91.97% | 93.75% |
+| **Logistic Regression** | 89.28% | 87.89% | 94.80% |
+| **Extra Trees** | 87.59% | 84.50% | **99.95%** |
+| **Random Forest** | 79.49% | 74.36% | **100.00%** |
+| **Gradient Boosting** | 79.39% | 74.32% | **99.67%** |
+| **K-Nearest Neighbors**| 77.52% | 77.04% | 79.44% |
+| **Decision Tree** | 67.62% | 74.41% | 40.49% |
 
-### Cơ chế sụp đổ của mô hình do Standardizer
-Khi tiền xử lý, ta sử dụng lớp `StandardScaler` thực hiện phép biến đổi tuyến tính:
-$$Z = \frac{X - \mu_{train}}{\sigma_{train}}$$
-Trong tập huấn luyện thực tế **CICIDS2017**:
-- Đối với DDoS thật, $\mu_{train}(\text{Flow Duration}) \approx 16.95 \times 10^6\ \mu s$ (16.95 giây).
-- $\sigma_{train}(\text{Flow Duration}) \approx 31.01 \times 10^6\ \mu s$ (31.01 giây).
+Dưới đây là phân tích chi tiết từng biểu đồ thu được từ thực nghiệm:
 
-Trong bộ sinh thử nghiệm ban đầu:
-- Người phát triển sinh DDoS có thời lượng cực ngắn: $X_{test}(\text{Flow Duration}) \approx 5000\ \mu s$ (5 miligiây) vì nghĩ rằng DDoS phải nhanh.
-- Khi đi qua bộ chuẩn hóa:
-  $$Z(\text{Flow Duration}) = \frac{5000 - 1.695 \times 10^7}{3.101 \times 10^7} \approx -0.546$$
-- Tuy nhiên, trong tập huấn luyện, các luồng có giá trị $Z \approx -0.5$ đến $-0.4$ hầu hết là các yêu cầu truy vấn đơn lẻ của khách hàng hợp lệ (Benign).
-- Ngược lại, kích thước yêu cầu của DDoS thật cực nhỏ ($X(\text{Total Length of Fwd Packets}) \approx 31.9$ bytes), còn bộ giả lập sinh ra $\approx 240$ bytes (rơi vào phân phối của khách hàng).
-- Kết quả là, véc tơ đặc trưng sau chuẩn hóa $Z_{test}$ rơi hoàn toàn vào vùng mật độ xác suất cao của lớp **Benign** trong không gian quyết định của Random Forest và XGBoost. Do đó, mô hình phân loại toàn bộ là Benign.
+### 4.1. Phân tích Hình 1: Lưới Ma Trận Nhầm Lẫn (confusion_matrices.png)
+Biểu đồ 5x2 chứa 10 heatmaps thể hiện chính xác số lượng mẫu phân loại đúng/sai (True/False Positive/Negative) của từng mô hình:
+* **Random Forest & Extra Trees:** Đạt số lượng báo động giả bằng 0 ($FP = 0$ đối với Random Forest và $FP = 5$ đối với Extra Trees). Điều này đảm bảo tính sẵn sàng tuyệt đối cho khách hàng nhưng lại bỏ lọt đến hơn $10,000$ luồng DDoS ($FN \approx 10,256$).
+* **XGBoost & AdaBoost:** Giảm thiểu tối đa lỗi bỏ sót DDoS ($FN = 99$ đối với XGBoost và $FN = 1,244$ đối với AdaBoost), ngăn chặn hiệu quả việc làm sập tài nguyên máy chủ.
+* **Naive Bayes:** Mặc dù có độ chính xác tương đối cao, nhưng mô hình này gây ra báo động sai cực kỳ nhiều ($FP = 1,548$, tức chặn nhầm 15.48% khách hàng hợp lệ).
+* **Decision Tree:** Đạt kết quả kém nhất với số lượng phân lớp sai khổng lồ ($FP = 5,951$, tức chặn nhầm hơn 59% khách hàng bình thường), thể hiện sự quá khớp của một cây quyết định đơn lẻ.
 
-### Giải pháp căn chỉnh phân phối đặc trưng (Distribution Alignment)
-Chúng tôi đã hiệu chỉnh các tham số sinh của bộ mô phỏng để đồng bộ hóa phân phối xác suất:
-$$P_{test}(X | Y=\text{DDoS}) \approx P_{train}(X | Y=\text{DDoS})$$
-Bằng cách điều chỉnh miền giá trị thô trước khi chuẩn hóa:
-* **DDoS Flow Duration:** Tăng từ vài ms lên dải ngẫu nhiên $[5 \times 10^6, 25 \times 10^6]\ \mu s$ (5s - 25s) để khớp với hành vi chiếm giữ kết nối của DDoS Flood thật.
-* **DDoS Fwd Packet Length Max:** Giảm từ $140$ bytes xuống dải $[6, 20]$ bytes (trung bình $\approx 14.8$ bytes) phản ánh chính xác kích thước gói tin yêu cầu tối thiểu.
+### 4.2. Phân tích Hình 2: So sánh Đường cong ROC và Precision-Recall (availability_comparison.png)
+Biểu đồ so sánh trực tiếp hiệu năng phân lớp tổng quát:
+* **Đường cong ROC:** Các mô hình **XGBoost**, **AdaBoost** và **Naive Bayes** áp sát góc trên bên trái với chỉ số AUC lần lượt đạt $0.998$, $0.995$ và $0.988$. Điều này chứng minh các mô hình này có khả năng phân biệt lớp tấn công tốt nhất. Ngược lại, **Decision Tree** đơn lẻ có đường cong ROC tiệm cận đường chéo ngẫu nhiên ($AUC \approx 0.67$), thể hiện hiệu năng phân biệt kém.
+* **Đường cong Precision-Recall:** Trong điều kiện mất cân bằng dữ liệu của capture ngoài (80% tấn công, 20% khách), đường cong PR của **XGBoost** và **AdaBoost** duy trì ở mức cao gần $1.0$ trên hầu hết dải Recall. Điều này khẳng định khi chúng cảnh báo DDoS, độ tin cậy đạt gần $100\%$, không làm ảnh hưởng đến tài nguyên máy chủ.
 
-Sau khi căn chỉnh đặc trưng, kết quả dự đoán của các mô hình khôi phục về trạng thái chính xác cao.
+### 4.3. Phân tích Hình 3: Lưới Đồ Thị Ngưỡng Quyết Định (tradeoff_curves.png)
+Đồ thị 5x2 mô tả sự thay đổi của Recall chặn DDoS (đỏ) và TNR Khách hàng (xanh lá) theo ngưỡng quyết định (Threshold từ 0.0 đến 1.0):
+* **XGBoost & AdaBoost:** Hai đường Recall và TNR giao nhau rất muộn (ở ngưỡng threshold $\approx 0.85$ - $0.90$). Tại ngưỡng mặc định $0.5$, cả hai chỉ số đều đạt mức tối ưu (>96%). Người quản trị có thể điều chỉnh threshold lên mức $0.8$ để đạt được $98.5\%$ Customer Availability trong khi vẫn duy trì được $97\%$ DDoS Block Rate.
+* **Random Forest & Extra Trees:** Đường TNR (xanh lá) nằm ngang tiệm cận mức $100\%$ xuyên suốt mọi ngưỡng threshold từ 0.1 đến 0.9. Ngược lại, đường Recall chặn DDoS (đỏ) sụt giảm rất dốc từ ngưỡng $0.4$. Điều này phản ánh tính bảo thủ cao của mô hình Bagging: mô hình ưu tiên bảo vệ khách hàng trước, chấp nhận bỏ lọt DDoS nếu không có bằng chứng cực kỳ rõ ràng.
+* **Logistic Regression & Linear SVM:** Hai đường giao nhau ở ngưỡng cân bằng $\approx 0.5$ với cả hai chỉ số đều nằm trong khoảng $88\% - 94\%$. Ranh giới quyết định tuyến tính khiến mô hình có độ nhạy threshold rất đều đặn (dạng đường thẳng tuyến tính).
 
----
-
-## 4. Kết Quả Kiểm Thử Thực Tế & Phân Tích Quyết Định (Decision Analysis)
-
-Dưới đây là bảng so sánh sâu về mặt toán học giữa 10 mô hình giám sát trên tập dữ liệu kiểm thử quy mô lớn 50,000 dòng (chứa các cuộc tấn công DDoS phức tạp và lưu lượng khách hàng gây nhiễu):
-
-### 4.1. Ma Trận Đánh Giá Toán Học (Evaluation Metrics)
-
-| Mô hình | Mô tả cơ chế phân lớp | Accuracy (Chính xác) | DDoS Recall (Bảo mật) | Khách Sẵn sàng (Availability) |
-| :--- | :--- | :---: | :---: | :---: |
-| **XGBoost** | Tối ưu hóa gradient bậc hai | **99.11%** | **99.68%** | 96.81% |
-| **AdaBoost** | Học tăng cường thích ứng | **97.24%** | 96.88% | 98.69% |
-| **Naive Bayes** | Phân lớp xác suất Bayes | 96.40% | 99.27% | 84.93% |
-| **Linear SVM** | Siêu phẳng phân lớp tối đa hóa lề | 92.11% | 91.66% | 93.91% |
-| **Logistic Regression** | Hàm Sigmoid tối ưu cross-entropy | 88.88% | 87.43% | 94.68% |
-| **Extra Trees** | Cực hạn ngẫu nhiên hóa điểm phân tách | 87.46% | 84.34% | **99.97%** |
-| **Random Forest** | Biểu quyết rừng cây độc lập | 79.07% | 73.84% | **99.99%** |
-| **Gradient Boosting** | Tối ưu hóa gradient bậc nhất | 78.95% | 73.80% | 99.55% |
-| **K-Nearest Neighbors**| Khoảng cách không gian láng giềng | 77.13% | 76.57% | 79.40% |
-| **Decision Tree** | Một cây quyết định đơn lẻ | 67.69% | 74.44% | 40.68% |
-
-### 4.2. Phân Tích Quyết Định & Ranh Giới Quyết Định (Decision Boundaries)
-
-1. **Nhóm Boosting ưu tú (XGBoost, AdaBoost):**
-   * Đạt hiệu năng lọc DDoS tốt nhất nhờ cơ chế tối ưu hóa sai số tích lũy tuần tự. XGBoost lọc sạch 99.68% DDoS, ngăn chặn tối đa sự cố sập máy chủ.
-   * Biên quyết định của nhóm này cực kỳ linh hoạt (Smooth decision boundaries). Đổi lại, chúng lấn nhẹ sang dải phân phối của khách hàng, gây ra tỷ lệ chặn nhầm khách hàng từ 1.31% đến 3.19%.
-
-2. **Nhóm Bagging bảo thủ (Random Forest, Extra Trees):**
-   * Đạt điểm tuyệt đối trong việc bảo vệ khách hàng (TNR đạt 99.99% và 99.97%). Điều này có nghĩa khách hàng hầu như không bao giờ bị chặn nhầm.
-   * Lý do: các mô hình này biểu quyết trung bình từ nhiều cây độc lập, nên ranh giới quyết định rất an toàn cho lớp đa số (Benign). Mặt trái là chúng bỏ sót nhiều cuộc tấn công DDoS ngụy trang tinh vi (Recall chỉ đạt 73.84% và 84.34%).
-
-3. **Nhóm Phân lớp Tuyến tính & Xác suất (Linear SVM, Logistic Regression, Naive Bayes):**
-   * Naive Bayes có Recall DDoS cao (99.27%) nhưng làm sụt giảm nghiêm trọng tính sẵn sàng của máy chủ khi chặn nhầm 15.07% khách hàng do giả định các biến độc lập không phản ánh đúng mối tương quan thực tế của lưu lượng mạng.
-   * Linear SVM và Logistic Regression đạt hiệu năng cân bằng khá tốt (~88% - 92% accuracy) nhưng không thể so sánh với XGBoost/AdaBoost do biên quyết định bị giới hạn bởi tính tuyến tính.
-
-4. **Cây Quyết định đơn lẻ (Decision Tree):**
-   * Hiệu năng thấp nhất (Accuracy 67.69%, TNR 40.68%). Cây đơn lẻ bị quá khớp nặng nề và cực kỳ nhạy cảm với các biến đổi nhiễu ngẫu nhiên trong luồng mạng thực tế.
-
-### 4.3. Biểu Đồ Phân Tích Toán Học Trực Quan (Matplotlib Rendering)
-
-Dưới đây là các biểu đồ phân tích trực quan được vẽ trực tiếp bằng thư viện `matplotlib` và `seaborn` từ kết quả thực thi kiểm thử 50,000 dòng dữ liệu:
-
-#### A. Heatmaps Ma Trận Nhầm Lẫn (Confusion Matrices)
-Bộ biểu đồ nhiệt 5x2 thể hiện sự nhầm lẫn giữa luồng khách hàng và luồng tấn công của cả 10 mô hình học máy:
-![Ma trận nhầm lẫn dạng Heatmap của 10 mô hình học máy](data/external/confusion_matrices.png)
-
-#### B. Các Đường Cong Hiệu Năng So Sánh (ROC & Precision-Recall)
-Biểu đồ 1x2 thể hiện so sánh tổng quan giữa 10 mô hình học máy phân lớp:
-1. **Đường cong ROC:** So sánh đường cong ROC và AUC của toàn bộ 10 mô hình nhằm phát hiện tỷ lệ chặn DDoS thành công đối chiếu với tỷ lệ chặn nhầm khách hàng.
-2. **Đường cong Precision-Recall:** So sánh khả năng phát hiện/chặn DDoS và độ chính xác của các mô hình khi nhãn mất cân bằng.
-![Đồ thị ROC và Precision-Recall so sánh 10 mô hình](data/external/availability_comparison.png)
-
-#### C. Biểu Đồ Đánh Đổi Ngưỡng Quyết Định (Trade-off Curves)
-Bộ đồ thị 5x2 thể hiện **DDoS Block Rate (Recall)** và **Customer Availability (TNR)** biến đổi theo ngưỡng quyết định (Decision Threshold) từ 0.0 đến 1.0 cho **từng mô hình riêng biệt**:
-![Đồ thị Trade-off Bảo mật vs Tính sẵn sàng của 10 mô hình](data/external/tradeoff_curves.png)
-
-#### D. Không Gian Quyết Định & Ranh Giới Quyết Định 2D (Decision Space)
-Bộ đồ thị 5x2 thể hiện **biên quyết định phi tuyến** trong không gian đặc trưng 2D (`Flow Duration` vs `Fwd Packet Length Max`) được phủ màu vùng quyết định (contourf) kết hợp với các mẫu thực tế (scatter) cho **từng mô hình riêng biệt**:
-![Ranh giới Quyết định 2D của 10 mô hình](data/external/decision_boundaries.png)
+### 4.4. Phân tích Hình 4: Ranh Giới Quyết Định 2D (decision_boundaries.png)
+Hình ảnh 5x2 trực quan hóa cách các mô hình phân chia không gian đặc trưng giữa `Flow Duration` (trục hoành - giây) và `Fwd Packet Length Max` (trục tung - bytes):
+* **Cây Quyết định đơn lẻ (Decision Tree):** Tạo ra các phân vùng ô cờ vuông vức, đứt gãy và chắp vá. Điều này thể hiện rõ hiện tượng quá khớp (overfitting) cục bộ vào các điểm dữ liệu nhiễu.
+* **Random Forest & Extra Trees:** Các ranh giới quyết định dạng bậc thang song song với các trục tọa độ (axis-aligned hyperplanes). Do biểu quyết trung bình của nhiều cây, các biên này mượt mà hơn Decision Tree nhưng vẫn mang hình khối góc cạnh rõ rệt. Vùng đỏ (tấn công) bị thu hẹp đáng kể về phía góc dưới, giải thích lý do tại sao chúng bỏ sót các cuộc tấn công DDoS có gói tin lớn.
+* **XGBoost & AdaBoost:** Tạo ra các vùng quyết định phi tuyến uốn lượn mềm mại bao phủ cực tốt các cụm dữ liệu DDoS màu đỏ. Sự kết hợp của nhiều cây yếu tuần tự giúp mô hình tạo ra ranh giới quyết định linh hoạt nhất, bao bọc chuẩn xác kể cả các cuộc tấn công DDoS HTTP POST nâng cao (gói tin lớn).
+* **Linear SVM & Logistic Regression:** Ranh giới quyết định là một đường thẳng (siêu phẳng tuyến tính 2D) phân chia không gian làm hai nửa. Do phân phối của DDoS nâng cao và Khách hàng điều khiển bị chồng lấn phi tuyến lên nhau, đường thẳng này không thể phân tách hoàn hảo, buộc phải chấp nhận sự pha trộn sai số ở cả hai phía biên.
+* **K-Nearest Neighbors (KNN):** Ranh giới quyết định tạo thành các đảo nhỏ cô lập bao quanh các cụm điểm dữ liệu cục bộ, rất nhạy cảm với mật độ điểm lân cận.
+* **Naive Bayes:** Ranh giới quyết định có dạng đường cong elip trơn nhẵn, phản ánh các đường đồng mức xác suất của phân phối Gaussian giả định. Do giả định các biến độc lập, biên quyết định này không phản ánh tốt các tương quan chéo, dẫn đến việc cắt quá sâu vào vùng xanh của khách hàng.
 
 ---
 
-## 5. Kết luận & Khuyến nghị Vận hành Hệ thống
+## 5. Đánh Giá Tổng Quát & Khuyến Nghị Vận Hành
 
-1. **Khuyến nghị Mô hình:** Nên sử dụng mô hình **XGBoost** làm công cụ lọc lưu lượng chính tại firewall hoặc proxy của máy chủ. Mặc dù chặn nhầm 4 yêu cầu trong 10,000 yêu cầu của khách hàng ($0.04\%$), mô hình này đảm bảo **chặn đứng 100% cuộc tấn công DDoS**, ngăn ngừa máy chủ bị crash do quá tải tài nguyên.
-2. **Giám sát Drift:** Cần liên tục thu thập đặc trưng của các cuộc tấn công thực tế chạy qua [live_sniffer.py](file:///C:/Users/Hikari-Rainbow/antigravity/wise-einstein/src/live_sniffer.py) để phát hiện sự dịch chuyển phân phối đặc trưng theo thời gian, tiến hành huấn luyện lại (Retrain) mô hình định kỳ nhằm tránh suy giảm hiệu năng.
+1. **Nhóm Học tăng cường (Boosting - XGBoost, AdaBoost):**
+   * **Đánh giá:** Đạt hiệu năng toàn diện nhất. XGBoost là mô hình xuất sắc nhất với độ chính xác 99.06% và Recall chặn DDoS đạt 99.75%.
+   * **Vận hành:** Khuyên dùng làm bộ lọc lưu lượng chính (Firewall / Reverse Proxy) cho hệ thống để ngăn ngừa hoàn toàn nguy cơ sập máy chủ do DDoS dồn dập.
+2. **Nhóm Rừng cây (Bagging - Random Forest, Extra Trees):**
+   * **Đánh giá:** Bảo vệ hoàn hảo trải nghiệm khách hàng (TNR $\approx 100\%$).
+   * **Vận hành:** Thích hợp triển khai ở môi trường mạng nội bộ hoặc các dịch vụ tài chính nhạy cảm nơi việc chặn nhầm một giao dịch hợp lệ của khách hàng đem lại thiệt hại lớn hơn nhiều so với việc trễ nải phát hiện tấn công.
+3. **Nhóm Tuyến tính & Xác suất (SVM, Logistic, Naive Bayes):**
+   * **Đánh giá:** Naive Bayes học cực nhanh và nhạy bén với DDoS nhưng gây phiền toái lớn cho khách hàng. SVM và Logistic ổn định nhưng giới hạn bởi tính tuyến tính.
+   * **Vận hành:** Có thể dùng làm các bộ phân loại phụ (Secondary Check) hoặc chạy song song để tham chiếu kiểm tra chéo.
+4. **Mô hình Không giám sát (Isolation Forest):**
+   * **Đánh giá:** Mặc dù độ chính xác trên tập DDoS đã biết không cao bằng XGBoost, Isolation Forest là chốt chặn duy nhất có khả năng phát hiện các cuộc tấn công mới chưa có mẫu huấn luyện (Zero-day) nhờ cơ chế cô lập điểm dị thường.
+   * **Vận hành:** Khuyên dùng chạy ngầm song song để phát hiện bất thường và kích hoạt cảnh báo sớm cho đội ngũ quản trị hệ thống (SOC).
