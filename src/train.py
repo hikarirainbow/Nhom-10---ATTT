@@ -44,7 +44,10 @@ def generate_mock_dataset(num_samples=5000):
 
 def main():
     # 1. Tìm kiếm file CSV trong thư mục data/raw/
-    csv_files = [f for f in os.listdir(config.RAW_DATA_DIR) if f.endswith('.csv')]
+    all_csv_files = [f for f in os.listdir(config.RAW_DATA_DIR) if f.endswith('.csv')]
+    
+    # Chỉ giữ các tệp tin chứa 'tuesday', 'wednesday', 'thursday' để tránh rò rỉ dữ liệu (data leakage)
+    csv_files = [f for f in all_csv_files if any(day in f.lower() for day in ['tuesday', 'wednesday', 'thursday'])]
     
     if not csv_files:
         df = generate_mock_dataset(num_samples=5000)
@@ -54,8 +57,8 @@ def main():
         print(f"[*] Đang tải dữ liệu thực từ: {filepath}")
         df = pd.read_csv(filepath)
     else:
-        # Tải và gộp dữ liệu từ toàn bộ các file (tất cả các ngày trong tuần)
-        print(f"[*] Phát hiện {len(csv_files)} file CSV thực tế. Đang tải và gộp mẫu dữ liệu từ toàn bộ tuần CICIDS2017...")
+        # Tải và gộp dữ liệu từ toàn bộ các file (tất cả các ngày trong tuần được lọc)
+        print(f"[*] Phát hiện {len(csv_files)} file CSV thực tế để huấn luyện. Đang tải và gộp mẫu dữ liệu...")
         dfs = []
         for file in csv_files:
             filepath = os.path.join(config.RAW_DATA_DIR, file)
@@ -98,6 +101,24 @@ def main():
     # Chia tập Train / Test
     X_train, X_test, y_train, y_test = train_test_split(X_bal, y_bal, test_size=0.2, random_state=42)
     
+    # 3.5. Nghiên cứu Overfitting trên Decision Tree với các độ sâu khác nhau
+    print("\n" + "=" * 65)
+    print(" 📊 NGHIÊN CỨU CHIỀU SÂU CÂY QUYẾT ĐỊNH (DECISION TREE DEPTH STUDY)")
+    print("=" * 65)
+    from sklearn.tree import DecisionTreeClassifier
+    depths = [3, 5, 8, 12, 20, None]
+    print(f" {'Max Depth':<10} | {'Train Accuracy':<16} | {'Test Accuracy':<16} | {'Overfitting Gap'}")
+    print("-" * 65)
+    for d in depths:
+        dt_test = DecisionTreeClassifier(max_depth=d, random_state=42)
+        dt_test.fit(X_train, y_train)
+        train_acc = dt_test.score(X_train, y_train) * 100
+        test_acc = dt_test.score(X_test, y_test) * 100
+        gap = train_acc - test_acc
+        depth_str = str(d) if d is not None else "None (Max)"
+        print(f" {depth_str:<10} | {train_acc:>13.2f}% | {test_acc:>13.2f}% | {gap:>12.2f}%")
+    print("-" * 65 + "\n")
+
     # Lưu kết quả đánh giá để so sánh cuối cùng
     comparison_results = {}
     

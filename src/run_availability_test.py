@@ -119,6 +119,13 @@ def main():
             customer_blocked_rate = (fp / (tn + fp)) * 100 if (tn + fp) > 0 else 0.0
             accuracy = ((tp + tn) / len(y_true_binary)) * 100
             
+            tpr = ddos_block_rate / 100.0
+            fpr = customer_blocked_rate / 100.0
+            
+            # Tính toán xác suất hậu nghiệm Bayes P(Attack | Alert) cho các tỷ lệ cơ sở khác nhau
+            bayes_01 = ((tpr * 0.001) / (tpr * 0.001 + fpr * 0.999)) * 100 if (tpr * 0.001 + fpr * 0.999) > 0 else 0.0
+            bayes_50 = ((tpr * 0.05) / (tpr * 0.05 + fpr * 0.95)) * 100 if (tpr * 0.05 + fpr * 0.95) > 0 else 0.0
+            
             model_stats[m_name] = {
                 'ddos_block': ddos_block_rate,
                 'customer_avail': customer_availability,
@@ -127,7 +134,9 @@ def main():
                 'tp': tp,
                 'tn': tn,
                 'fp': fp,
-                'fn': fn
+                'fn': fn,
+                'bayes_01': bayes_01,
+                'bayes_50': bayes_50
             }
             
             print(f"[+] Đã hoàn thành đánh giá {m_name} (Accuracy: {accuracy:.2f}%)")
@@ -136,14 +145,14 @@ def main():
             print(f"[!] Bỏ qua đánh giá {m_name}: Không tìm thấy file mô hình.")
             
     # In bảng so sánh trên Console
-    print("\n" + "=" * 85)
-    print("📊 BẢNG SO SÁNH HIỆU NĂNG 10 MÔ HÌNH (AVAILABILITY VS SECURITY)")
-    print("=" * 85)
-    print(f" {'Mô hình':<22} | {'Chặn DDoS (Recall)':<20} | {'Khách Sẵn sàng (TNR)':<20} | {'Độ chính xác':<15}")
-    print("-" * 85)
+    print("\n" + "=" * 125)
+    print("📊 BẢNG SO SÁNH HIỆU NĂNG & XÁC SUẤT BÁO ĐỘNG THỰC TẾ (BAYESIAN DETECTION RATE)")
+    print("=" * 125)
+    print(f" {'Mô hình':<22} | {'Recall (Chặn DDoS)':<18} | {'TNR (Khách Sẵn sàng)':<20} | {'P(Attack|Alert) θ=0.1%':<22} | {'P(Attack|Alert) θ=5%':<20} | {'Accuracy':<10}")
+    print("-" * 125)
     for name, stats in model_stats.items():
-        print(f" {name:<22} | {stats['ddos_block']:>18.2f}% | {stats['customer_avail']:>18.2f}% | {stats['acc']:>13.2f}%")
-    print("=" * 85)
+        print(f" {name:<22} | {stats['ddos_block']:>16.2f}% | {stats['customer_avail']:>18.2f}% | {stats['bayes_01']:>20.2f}% | {stats['bayes_50']:>18.2f}% | {stats['acc']:>8.2f}%")
+    print("=" * 125)
     
     # 5. Vẽ biểu đồ chất lượng bằng Matplotlib & Seaborn
     print("\n" + "=" * 80)

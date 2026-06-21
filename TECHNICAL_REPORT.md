@@ -18,8 +18,10 @@ Hệ thống sử dụng tập dữ liệu **CICIDS2017** (được cung cấp v
 * **Chuẩn hóa StandardScaler:** Chuyển đổi các đặc trưng mạng có phân phối lệch (skewed distributions) về phân phối chuẩn hóa có trung bình $\mu = 0$ và độ lệch chuẩn $\sigma = 1$:
   $$Z = \frac{X - \mu}{\sigma}$$
 
-### 1.2. Danh sách 15 Đặc trưng Trích chọn (15 Core Features)
-Để tối ưu hóa thời gian huấn luyện đồng thời đảm bảo khả năng triển khai thực tế bắt gói tin thời gian thực qua card mạng, hệ thống trích lọc 15 đặc trưng quan trọng nhất:
+### 1.2. Phân tích lựa chọn đặc trưng bằng toán học (Feature Selection)
+Để đảm bảo tính khoa học và tối ưu hiệu năng sniffer thời gian thực, hệ thống đã chạy đánh giá xếp hạng đặc trưng mạng dựa trên độ lợi thông tin **Random Forest Gini Importance** trên tập dữ liệu huấn luyện (ngày thứ Ba, Tư, Năm). Biểu đồ xếp hạng 20 đặc trưng mạng quan trọng nhất được lưu tại [feature_importance.png](file:///C:/Users/Hikari-Rainbow/antigravity/wise-einstein/data/external/feature_importance.png).
+
+Kết quả chỉ ra các thuộc tính liên quan đến độ lệch chuẩn kích thước gói (`Bwd Packet Length Std`, `Packet Length Std`) và kích thước cửa sổ Forward (`Init_Win_bytes_forward`) đóng góp lượng thông tin cao nhất (>10%). 15 đặc trưng cốt lõi được lựa chọn trong dự án bao gồm:
 1. `Flow Duration` (Thời lượng luồng)
 2. `Total Fwd Packets` (Tổng số gói truyền đi)
 3. `Total Backward Packets` (Tổng số gói nhận về)
@@ -35,6 +37,8 @@ Hệ thống sử dụng tập dữ liệu **CICIDS2017** (được cung cấp v
 13. `Flow Packets/s` (Tốc độ truyền gói trên giây)
 14. `Flow IAT Mean` (Thời gian trung bình giữa các gói tin)
 15. `Flow IAT Max` (Thời gian lớn nhất giữa các gói tin)
+
+Các đặc trưng này đại diện cho các thuộc tính dễ bắt gói và tính toán nhanh, đồng thời là các biến thay thế (surrogates) mạnh mẽ cho các đặc trưng đứng đầu về Gini Importance, giúp cân bằng hoàn hảo giữa tốc độ sniffer và độ chính xác phân lớp.
 
 ---
 
@@ -89,54 +93,70 @@ Các luồng có $s \to 1$ có độ sâu trung bình ngắn, dễ bị cô lậ
 
 ---
 
-## 3. Thiết Lập Thực Nghiệm: Dữ Liệu Thực Tế CICIDS2017
+## 3. Thiết Lập Thực Nghiệm & Phân Chia Môi Trường Tránh Rò Rỉ Dữ Liệu
 
-Để đáp ứng yêu cầu thực nghiệm ngoài trên tập dữ liệu thực tế, hệ thống tiến hành tải trực tiếp tệp ghi lưu lượng thực tế **Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv** từ thư mục `data/raw/` của bộ dữ liệu CICIDS2017 gốc.
-* **Quy mô mẫu đánh giá:** Rút ngẫu nhiên **50,000 luồng mạng** độc lập từ file CSV thô (dung lượng 77MB) để thực nghiệm kiểm thử.
-* **Phân phối nhãn thực tế:**
+Để đảm bảo tính khoa học và loại bỏ hoàn toàn hiện tượng **Rò rỉ dữ liệu (Data Leakage)** do tính tương quan thời gian của các gói tin mạng, hệ thống phân chia môi trường thực nghiệm độc lập theo các ngày:
+* **Tập Huấn luyện (Training Set):** Gộp mẫu ngẫu nhiên từ dữ liệu các ngày **Thứ Ba, Thứ Tư, Thứ Năm** (chứa lưu lượng thông thường Benign và DoS, Web Attacks, Infiltration). Quy mô tập huấn luyện sau khi cân bằng undersampling là 15,000 dòng.
+* **Tập Kiểm thử Mù (Blind Test Set):** Hoàn toàn độc lập trên tệp lưu lượng **Friday Afternoon DDoS** (`Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv`).
+* **Quy mô Blind Test:** Rút ngẫu nhiên **50,000 luồng mạng** độc lập từ file CSV ngày thứ Sáu:
   - **Tấn công DDoS (DDoS Attack):** 28,419 luồng (56.84%)
   - **Lưu lượng hợp lệ (Benign):** 21,581 luồng (43.16%)
-* **Đặc tính dữ liệu:** Dữ liệu chứa các cuộc tấn công DDoS thực tế dạng LOIC/HOIC cùng các luồng truy cập thật của người dùng mạng, không sử dụng dữ liệu giả lập.
 
 ---
 
 ## 4. Phân Tích Thực Nghiệm Chi Tiết Qua Từng Biểu Đồ
 
-Kết quả thực nghiệm của 10 mô hình giám sát trên tập dữ liệu thực tế 50,000 dòng được thống kê định lượng dưới bảng sau:
+### 4.1. Khảo sát hiện tượng Quá khớp (Overfitting) trên Decision Tree
+Để chứng minh hạn chế của mô hình cây đơn lẻ, chúng tôi tiến hành khảo sát độ chính xác của Decision Tree trên tập Train vs tập Test dưới các giới hạn chiều sâu cây (`max_depth`) khác nhau:
 
-| Mô hình | Accuracy (Chính xác) | DDoS Recall (Bảo mật) | Khách Sẵn sàng (Availability) |
+| Độ sâu tối đa (max_depth) | Accuracy Tập Train | Accuracy Tập Test | Khoảng cách Quá khớp (Gap) |
 | :--- | :---: | :---: | :---: |
-| **Gradient Boosting** | **99.68%** | **99.83%** | 99.49% |
-| **Random Forest** | **99.62%** | **99.83%** | 99.34% |
-| **XGBoost** | **99.56%** | **99.81%** | 99.24% |
-| **Decision Tree** | 99.45% | 99.81% | 98.99% |
-| **K-Nearest Neighbors**| 99.15% | 99.77% | 98.33% |
-| **AdaBoost** | 99.08% | 99.88% | 98.03% |
-| **Extra Trees** | 98.27% | 99.90% | 96.14% |
-| **Logistic Regression** | 86.18% | 99.95% | 68.06% |
-| **Linear SVM** | 86.17% | 99.95% | 68.03% |
-| **Naive Bayes** | 79.35% | 99.96% | 52.21% |
+| **3** | 85.86% | 86.27% | -0.41% |
+| **5** | 92.88% | 92.33% | 0.54% |
+| **8** | 95.97% | 95.20% | 0.78% |
+| **12** | 98.01% | 96.93% | 1.07% |
+| **20** | 99.16% | 97.07% | 2.09% |
+| **Không giới hạn (None)** | **99.48%** | **97.07%** | **2.41%** |
 
-Dưới đây là phân tích chi tiết từng biểu đồ thu được từ thực nghiệm:
+*Ý nghĩa:* Khi không giới hạn độ sâu (None), Decision Tree đạt 99.48% trên tập Train nhưng tụt xuống 97.07% trên tập Test. Hiện tượng quá khớp xảy ra do cây quyết định đơn lẻ cố gắng chia cắt không gian mẫu quá mịn để ghi nhớ tập Train, làm giảm khả năng tổng quát hóa trên dữ liệu thực tế.
 
-### 4.1. Phân tích Hình 1: Lưới Ma Trận Nhầm Lẫn (confusion_matrices.png)
-Biểu đồ 5x2 chứa 10 heatmaps thể hiện chính xác số lượng mẫu phân loại đúng/sai (True/False Positive/Negative) của từng mô hình trên dữ liệu thực tế:
-* **Nhóm mô hình cây phân lớp (GB, RF, XGB, DT, Ada, ET):** Đạt tỷ lệ phân loại cực kỳ chính xác. Ví dụ, Gradient Boosting chỉ chặn nhầm 110 khách hàng (FP = 110) và chỉ bỏ sót 49 luồng DDoS (FN = 49) trên tổng số 50,000 dòng kiểm thử thực tế.
-* **Nhóm mô hình Tuyến tính (Logistic, SVM) & Naive Bayes:** Đạt Recall rất cao (FN < 15, nghĩa là bỏ sót cực ít DDoS) nhưng lại gây ra lượng cảnh báo sai khổng lồ. Naive Bayes chặn nhầm đến 10,314 khách hàng hợp lệ (FP = 10,314), làm sụt giảm nghiêm trọng tính sẵn sàng của hệ thống mạng (TNR chỉ đạt 52.21%).
-* **Decision Tree đơn lẻ:** Đạt kết quả xuất sắc (TNR 98.99%, Recall 99.81%), cho thấy tính phân tách rõ ràng của các đặc trưng DDoS LOIC gốc trong CICIDS2017.
+### 4.2. Bảng số liệu tổng hợp hiệu năng thực nghiệm mù (Blind Test)
+Dưới đây là bảng số liệu thống kê kết quả chạy thực nghiệm 50,000 luồng mạng đối với 10 mô hình học máy:
 
-### 4.2. Phân tích Hình 2: So sánh Đường cong ROC và Precision-Recall (availability_comparison.png)
-* **Đường cong ROC:** Các mô hình dạng cây quyết định và lân cận (Gradient Boosting, Random Forest, XGBoost, KNN, AdaBoost) đều có đường cong ROC áp sát góc trên bên trái với AUC đạt mức lý tưởng từ 0.992 đến 0.999.
-* **Đường cong Precision-Recall:** Thể hiện rõ sự suy giảm độ tin cậy của nhóm tuyến tính và Naive Bayes. Precision của Naive Bayes sụt giảm mạnh từ giai đoạn đầu, phản ánh tỷ lệ báo động giả (False Alarms) cực lớn, gây quá tải cho bộ phận quản trị mạng nếu đưa vào vận hành thực tế.
+| Mô hình | Accuracy | Recall (DDoS) | TNR (Sẵn sàng) | P(Attack\|Alert) θ=0.1% | P(Attack\|Alert) θ=5% |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **AdaBoost** | 91.88% | 98.35% | 83.36% | 0.59% | 23.73% |
+| **Linear SVM** | 91.57% | 91.33% | 91.88% | 1.11% | 37.19% |
+| **Logistic Regression**| 89.97% | 88.54% | 91.85% | 1.08% | 36.38% |
+| **Naive Bayes** | 89.27% | 99.76% | 75.46% | 0.41% | 17.62% |
+| **Extra Trees** | 79.10% | 63.69% | 99.39% | **9.51%** | **84.67%** |
+| **K-Nearest Neighbors**| 78.95% | 69.68% | 91.16% | 0.78% | 29.32% |
+| **Random Forest** | 78.83% | 63.75% | 98.69% | 4.64% | 71.90% |
+| **Decision Tree** | 77.86% | 63.39% | 96.90% | 2.01% | 51.88% |
+| **Gradient Boosting** | 76.47% | 63.89% | 93.04% | 0.91% | 32.56% |
+| **XGBoost** | 75.31% | 63.75% | 90.52% | 0.67% | 26.15% |
 
-### 4.3. Phân tích Hình 3: Lưới Đồ Thị Ngưỡng Quyết Định (tradeoff_curves.png)
-* **Các mô hình cây quyết định (GB, RF, XGB, DT):** Hai đường Recall (đỏ) và TNR (xanh lá) giao nhau cực kỳ trễ ở sát ngưỡng 0.95 và duy trì ở mức cao >99% tại ngưỡng mặc định 0.5. Người vận hành có thể an tâm sử dụng ngưỡng mặc định 0.5.
-* **Các mô hình tuyến tính (SVM, Logistic) & Naive Bayes:** Hai đường này giao nhau rất sớm ở khoảng ngưỡng 0.1 - 0.2. Tại ngưỡng mặc định 0.5, TNR của chúng chỉ đạt từ 52.2% đến 68.1% (chặn nhầm 32% - 48% khách hàng). Để bảo vệ tính sẵn sàng cho khách hàng trên các mô hình tuyến tính này, người quản trị buộc phải nâng ngưỡng quyết định lên mức >0.9.
+### 4.3. Phân tích Hình 1: Lưới Ma Trận Nhầm Lẫn (confusion_matrices.png)
+* **Nhóm tuyến tính (SVM, Logistic) & Naive Bayes:** Đạt Recall rất cao (đều >88%, cao nhất là Naive Bayes 99.76%), tức là bỏ sót cực ít DDoS. Tuy nhiên, tính sẵn sàng dịch vụ (TNR) bị kéo thấp (75% - 91%), chặn nhầm một lượng lớn khách hàng lành mạnh (ví dụ Naive Bayes chặn nhầm 5,296 khách hàng trên tổng số 21,581 luồng Benign).
+* **Nhóm mô hình cây (Random Forest, Extra Trees):** Đạt tính sẵn sàng rất cao (TNR lần lượt là 98.69% và 99.39%), hầu như không chặn nhầm khách thường. Nhưng khi gặp cuộc tấn công DDoS hoàn toàn mới ở ngày thứ Sáu, Recall của chúng bị giảm mạnh xuống mức 63.6% - 63.7%.
 
-### 4.4. Phân tích Hình 4: Ranh Giới Quyết Định 2D (decision_boundaries.png)
-* **Các mô hình dạng cây:** Tạo ra vùng ranh giới quyết định rất mạch lạc và vuông vắn (các đường bậc thang song song với trục). Random Forest, Gradient Boosting và XGBoost bao bọc chặt chẽ các cụm điểm dữ liệu DDoS màu đỏ mà không xâm phạm vào vùng màu xanh của khách hàng.
-* **Nhóm Tuyến tính (SVM, Logistic):** Siêu phẳng phân chia dạng đường thẳng bị ép nghiêng quá mức, lấn sâu vào khu vực phân bố của khách hàng để cố gắng đạt Recall 99.95% cho DDoS, dẫn đến vùng nhận diện nhầm lớn.
-* **KNN & Naive Bayes:** KNN tạo ra biên phân chia rất chi tiết bao quanh các mật độ điểm lân cận, còn Naive Bayes tạo ra các đường phân mức xác suất dạng cong elip trơn, nhưng cắt quá nhiều vào vùng phân bố Benign.
+### 4.4. Phân tích Hình 2: Đường cong ROC và Precision-Recall (availability_comparison.png)
+* **Precision-Recall Curve:** Thể hiện rõ nét nhược điểm của các mô hình tuyến tính và Naive Bayes. Đường cong Precision của các mô hình này bị tụt dốc nhanh chóng từ những giai đoạn đầu, phản ánh độ tin cậy của cảnh báo rất thấp do lượng báo động giả khổng lồ.
+
+### 4.5. Phân tích Hình 3: Lưới Đồ Thị Ngưỡng Quyết Định (tradeoff_curves.png)
+* **Nhóm mô hình cây:** Hai đường Recall (đỏ) và TNR (xanh lá) giao nhau ở khoảng ngưỡng 0.4 - 0.6. Tại ngưỡng mặc định 0.5, TNR đạt mức rất cao >98% nhưng Recall chỉ ở mức khoảng 63%.
+* **Nhóm mô hình tuyến tính & Naive Bayes:** Hai đường này giao nhau rất sớm ở khoảng ngưỡng 0.1 - 0.3. Tại ngưỡng mặc định 0.5, các mô hình này đạt Recall cao nhưng TNR lại bị kéo thấp nghiêm trọng.
+
+### 4.6. Phân tích Hình 4: Ranh Giới Quyết Định 2D (decision_boundaries.png)
+* **Nhóm Tuyến tính (SVM, Logistic):** Siêu phẳng phân chia dạng đường thẳng bị ép nghiêng lớn, cắt lấn sâu vào khu vực phân bố của khách hàng để cố gắng bao trọn các điểm DDoS, dẫn đến vùng nhận diện nhầm lớn.
+* **Các mô hình dạng cây:** Tạo ra ranh giới dạng bậc thang vuông vắn ôm sát các cụm dữ liệu, giúp bảo vệ tối đa lớp khách hàng nhưng lại bỏ sót một số luồng DDoS mới trên tập test mù.
+
+### 4.7. Phân tích Toán học về Ngụy biện tỷ lệ cơ sở (Base Rate Fallacy)
+Áp dụng định lý Bayes để tính toán xác suất thực tế một cảnh báo của IDS là cuộc tấn công thực sự $P(\text{Attack} | \text{Alert})$:
+$$P(\text{Attack} | \text{Alert}) = \frac{\text{Recall} \times \theta}{\text{Recall} \times \theta + (1 - \text{TNR}) \times (1 - \theta)}$$
+* Với tỷ lệ cơ sở thực tế $\theta = 0.1\%$, ngay cả mô hình Extra Trees có TNR cao lý tưởng (99.39%, tức FPR = 0.61%), xác suất $P(\text{Attack} | \text{Alert})$ cũng chỉ đạt **9.51%** (có nghĩa là 90.49% cảnh báo đưa ra là báo động giả).
+* Đối với Naive Bayes (TNR = 75.46%), xác suất này tụt xuống mức cực thấp là **0.41%** (99.59% cảnh báo là chặn nhầm khách).
+* Điều này chứng minh rằng chỉ số TNR cao trên tập dữ liệu cân bằng (50/50) là một cái bẫy ngụy biện. Khi đưa vào môi trường mạng tự nhiên có tỷ lệ tấn công cực nhỏ, số lượng cảnh báo giả sẽ lấn át hoàn toàn cảnh báo thật.
 
 ---
 
