@@ -1,60 +1,60 @@
 @echo off
-:: Set UTF-8 encoding for Windows Command Prompt to support Vietnamese characters
+:: Set UTF-8 encoding for Windows Command Prompt
 chcp 65001 > nul
 
 echo ========================================================================
-echo     🛡️  ĐANG KHỞI CHẠY HỆ THỐNG PHÁT HIỆN XÂM NHẬP MẠNG (IDS) AI  🛡️
-echo                    -- BÀI TẬP LỚN NHÓM 10 --
+echo      HE THONG PHAT HIEN XAM NHAP MANG (IDS) AI
+echo               -- BAI TAP LON NHOM 10 --
 echo ========================================================================
 echo.
 
 :: 1. Check Python installation
 where python >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] Không tìm thấy Python trong hệ thống!
-    echo Vui lòng cài đặt Python (phiên bản khuyên dùng: 3.9 - 3.11) và thêm vào PATH.
+    echo [ERROR] Khong tim thay Python trong he thong!
+    echo Vui long cai dat Python phien ban tu 3.9 den 3.11 va them vao PATH.
     pause
     exit /b 1
 )
 
 :: 2. Check and create Python virtual environment (venv)
 if not exist "venv" (
-    echo [*] Đang khởi tạo môi trường ảo Python (venv)...
+    echo [*] Dang khoi tao moi truong ao Python venv...
     python -m venv venv
     if %errorlevel% neq 0 (
-        echo [ERROR] Tạo môi trường ảo thất bại!
+        echo [ERROR] Tao moi truong ao that bai!
         pause
         exit /b 1
     )
-    echo [✓] Đã tạo môi trường ảo thành công.
+    echo [+] Da tao moi truong ao thanh cong.
     echo.
 )
 
 :: 3. Activate venv
-echo [*] Đang kích hoạt môi trường ảo...
+echo [*] Dang kich hoat moi truong ao...
 call venv\Scripts\activate
 if %errorlevel% neq 0 (
-    echo [ERROR] Kích hoạt môi trường ảo thất bại!
+    echo [ERROR] Kich hoat moi truong ao that bai!
     pause
     exit /b 1
 )
-echo [✓] Đã kích hoạt môi trường ảo.
+echo [+] Da kich hoat moi truong ao.
 echo.
 
 :: 4. Install / Update dependencies
-echo [*] Đang kiểm tra và cài đặt các thư viện cần thiết (requirements.txt)...
+echo [*] Dang kiem tra va cai dat cac thu vien can thiet...
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 if %errorlevel% neq 0 (
-    echo [ERROR] Cài đặt thư viện thất bại!
+    echo [ERROR] Cai dat thu vien that bai!
     pause
     exit /b 1
 )
-echo [✓] Cài đặt thư viện hoàn tất.
+echo [+] Cai dat thu vien hoan tat.
 echo.
 
 :: 5. Launch the main script
-echo [*] Khởi động giao diện điều khiển ứng dụng...
+echo [*] Khoi dong giao dien dieu khien ung dung...
 timeout /t 1 > nul
 cls
 python run_project.py
