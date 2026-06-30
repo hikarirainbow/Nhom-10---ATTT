@@ -1,9 +1,9 @@
-# 🛡️ Hệ Thống Phát Hiện Xâm Nhập Mạng (IDS) Ứng Dụng Trí Tuệ Nhân Tạo (AI)
+# Hệ Thống Phát Hiện Xâm Nhập Mạng (IDS) Ứng Dụng Trí Tuệ Nhân Tạo (AI)
 ### 👥 Bài tập lớn Nhóm 10 - An toàn thông tin
 
 Dự án này là một ứng dụng phát hiện xâm nhập mạng (IDS) hoàn chỉnh, kết hợp cả học máy có giám sát (Supervised Learning) và học không giám sát (Anomaly Detection) để nhận diện các cuộc tấn công mạng (DoS, DDoS, Port Scan, Infiltration, Web Attacks) dựa trên dữ liệu lưu lượng gói tin.
 
-Ứng dụng đã được tối ưu hóa, loại bỏ các file nháp/thực nghiệm tạm thời và đóng gói gọn gàng đi kèm file tự động chạy `run.bat`.
+Hệ thống sử dụng kiến trúc phân tầng tối ưu (Cascaded Classifier) để cân bằng giữa năng lực phát hiện tấn công và tính sẵn sàng của hệ thống (giảm báo động giả).
 
 ---
 
@@ -12,31 +12,33 @@ Dự án này là một ứng dụng phát hiện xâm nhập mạng (IDS) hoàn
 ```text
 Nhóm 10 - ATTT/
 ├── data/
-│   ├── raw/                 # Chứa các file CSV dữ liệu gốc CICIDS2017 phục vụ huấn luyện ( Tuesday/Wednesday/Thursday)
-│   ├── processed/           # Dữ liệu sau khi xử lý và chuẩn hóa (thư mục trống phục vụ lưu trữ trung gian)
-│   └── external/            # File kiểm thử mù Friday Afternoon DDoS và các biểu đồ đầu ra đã vẽ sẵn:
-│                            ├── large_ddos_availability_test.csv  # 50,000 luồng kiểm thử mù
-│                            ├── availability_comparison.png       # Biểu đồ ROC & Precision-Recall
-│                            ├── confusion_matrices.png            # Lưới ma trận nhầm lẫn
-│                            ├── decision_boundaries.png           # Ranh giới quyết định 2D
-│                            ├── tradeoff_curves.png               # Đường cong đánh đổi Recall vs TNR
-│                            └── feature_importance.png            # Xếp hạng thuộc tính Gini Importance
-├── models/                  # Lưu trữ 11 mô hình đã huấn luyện (.pkl) và bộ chuẩn hóa scaler (.pkl)
+│   ├── raw/                 # Chứa dữ liệu CSV gốc CICIDS2017 (Monday-Friday) dùng để huấn luyện
+│   │   └── mock_cicids2017.csv # File dữ liệu giả lập dự phòng dùng để chạy thử nghiệm nhanh
+│   ├── processed/           # Dữ liệu sau khi xử lý (thư mục trống phục vụ lưu trữ trung gian)
+│   └── external/            # Biểu đồ đánh giá đầu ra:
+│                            ├── cascaded_confusion_matrix.png # Ma trận nhầm lẫn mô hình phân tầng
+│                            ├── cascaded_roc_curve.png        # Đường cong ROC & PR
+│                            └── cascaded_tradeoff.png         # Đường cong đánh đổi Recall vs TNR
+├── models/                  # Lưu trữ 11 mô hình (.pkl) và bộ chuẩn hóa scaler (.pkl) đã huấn luyện
 ├── src/                     # Mã nguồn ứng dụng core Python
 │   ├── __init__.py
-│   ├── cli_visualizer.py     # Bộ hiển thị giao diện bảng biểu CLI trực quan
-│   ├── config.py             # Cấu hình siêu tham số, ngưỡng cảnh báo, 15 đặc trưng chọn lọc
-│   ├── evaluate.py           # Đánh giá kiểm thử chéo trên file CSV bên ngoài
-│   ├── live_sniffer.py       # Capture gói tin thời gian thực bằng Scapy & phân loại trực tuyến
-│   ├── models.py             # Định nghĩa/khởi tạo 11 lớp mô hình học máy
-│   ├── preprocessing.py      # Tiền xử lý dữ liệu, chuẩn hóa (StandardScaler), xử lý mất cân bằng
-│   ├── run_availability_test.py # Chạy giả lập kiểm thử mù 50k luồng & tính toán Bayes
-│   └── train.py              # Huấn luyện mô hình (hỗ trợ tạo Mock Data nếu thiếu file raw)
+│   ├── cli_visualizer.py      # Bộ hiển thị giao diện bảng biểu CLI trực quan (không emoji)
+│   ├── config.py              # Cấu hình siêu tham số, card mạng, 15 đặc trưng chọn lọc
+│   ├── download_dataset.py    # Script tự động tải bộ dữ liệu nén gốc từ Google Drive
+│   ├── evaluate.py            # Đánh giá kiểm thử chéo trên file CSV bên ngoài
+│   ├── live_sniffer.py        # Module capture gói tin ở chế độ background
+│   ├── live_sniffer_interactive.py # Sniffer mạng tương tác thời gian thực với slider phím bấm
+│   ├── models.py              # Định nghĩa kiến trúc phân tầng CascadedIDSModel (Ada L1 + ET L2)
+│   ├── preprocessing.py       # Tiền xử lý dữ liệu, chuẩn hóa (StandardScaler), xử lý mất cân bằng
+│   ├── run_availability_test.py # Chạy đánh giá so sánh 10 mô hình cơ bản và tính Bayes
+│   ├── run_cascaded_simulation.py # Chạy mô phỏng hiệu năng chi tiết và xuất 3 biểu đồ chính
+│   ├── run_multi_dataset_eval.py  # Đánh giá chéo Cascaded IDS trên 7 ngày dữ liệu thực tế
+│   └── train.py               # Huấn luyện 11 thuật toán trên toàn bộ 5 ngày dữ liệu tổng hợp
 ├── run.bat                  # File khởi chạy tự động (Tự tạo venv, cài đặt thư viện và chạy ứng dụng)
-├── run_project.py           # File điều phối menu CLI chính của ứng dụng
+├── run_project.py           # File điều phối menu CLI chính của ứng dụng (0-8)
+├── check_environment.ps1    # Script kiểm tra tính toàn vẹn của dữ liệu và mô hình AI
 ├── requirements.txt         # Danh sách thư viện Python cần thiết
-├── BAO_CAO_IDS_AI_v4.docx   # Báo cáo chuyên đề hoàn chỉnh (v4) chứa toán học chuyên sâu & biểu đồ thực nghiệm
-└── README.md                # Tài liệu hướng dẫn sử dụng này (File .md duy nhất)
+└── README.md                # Tài liệu hướng dẫn sử dụng này
 ```
 
 ---
@@ -46,72 +48,66 @@ Nhóm 10 - ATTT/
 Ứng dụng được thiết kế để chạy cực kỳ đơn giản trên hệ điều hành Windows thông qua file đóng gói tự động `run.bat`.
 
 ### Cách chạy:
-1. Nhấp đúp chuột vào file `run.bat` (hoặc chạy từ cmd/PowerShell: `.\run.bat`).
+1. Nhấp đúp chuột vào file `run.bat` (hoặc chạy từ cmd/PowerShell dưới quyền Administrator: `.\run.bat`).
 2. Script sẽ tự động:
    * Kiểm tra phiên bản Python trên máy tính.
    * Tự tạo môi trường ảo Python cô lập (`venv`) nếu chưa có để tránh xung đột thư viện.
-   * Kích hoạt `venv` và nâng cấp `pip`.
-   * Cài đặt tự động toàn bộ thư viện cần thiết từ `requirements.txt`.
+   * Kích hoạt `venv` và cài đặt tự động toàn bộ thư viện cần thiết từ `requirements.txt`.
    * Khởi chạy bảng điều khiển trung tâm (`run_project.py`).
 
-> [!NOTE]
-> Trên hệ điều hành Windows, module giám sát thời gian thực (`live_sniffer.py`) bắt buộc cần cài đặt công cụ **Npcap** để bắt gói tin ở tầng thấp. Bạn có thể tải miễn phí tại: [https://npcap.com/](https://npcap.com/)
+> [!IMPORTANT]
+> Trên hệ điều hành Windows, module giám sát thời gian thực (`live_sniffer_interactive.py`) bắt buộc cần cài đặt công cụ **Npcap** để bắt gói tin ở tầng thấp. Bạn có thể tải miễn phí tại: [https://npcap.com/](https://npcap.com/)
 
 ---
 
 ## 🎮 Các Chức năng Trên Giao diện Điều khiển (Menu CLI)
 
-Khi chạy `run.bat`, bạn sẽ thấy một menu tương tác dạng console với các lựa chọn từ 1 đến 7:
+Khi chạy `run.bat`, bạn sẽ thấy một menu tương tác dạng console với các lựa chọn từ 0 đến 8 (không sử dụng emoji, giao diện chuẩn hóa học thuật):
 
-* **[1] Cài đặt Thư viện Phụ thuộc (pip install):** Cài đặt hoặc cập nhật thủ công các thư viện trong `requirements.txt`.
-* **[2] Huấn luyện Mô hình & So sánh Thuật toán (train.py):**
-  * Huấn luyện 11 mô hình dựa trên dữ liệu lưu lượng mạng của ngày thứ Ba/Tư/Năm (tránh rò rỉ dữ liệu).
-  * Hạn chế hiện tượng quá khớp (Overfitting) của mô hình cây bằng cách thiết lập giới hạn chiều sâu (`max_depth`).
-  * *Nếu chưa tải dữ liệu CICIDS2017 về thư mục `data/raw/`*, hệ thống sẽ tự động tạo tập dữ liệu giả lập (mock data) để bạn chạy thử nghiệm luồng code huấn luyện ngay lập tức.
-* **[3] Kiểm thử chéo với Dataset bên ngoài (.csv) (evaluate.py):** Tải các mô hình đã lưu từ thư mục `models/` để dự đoán và đánh giá hiệu năng của một file CSV lưu lượng tùy chọn.
-* **[4] Chạy sniffer mạng trực tiếp trên Máy tính (live_sniffer.py):**
-  * Yêu cầu mở Command Prompt/PowerShell bằng quyền **Administrator** (Run as Administrator) để bắt gói tin mạng.
-  * Lựa chọn mô hình AI (như Random Forest, AdaBoost, Logistic...) để làm bộ phân loại.
-  * Ứng dụng sẽ bắt trực tiếp các gói tin đi qua card mạng máy tính của bạn, gộp thành luồng (Flow), tính toán 15 đặc trưng cốt lõi và đưa ra cảnh báo độc hại màu đỏ trực quan trên màn hình console nếu phát hiện tấn công.
-* **[5] Mô phỏng & Đánh giá Tính Sẵn sàng Máy chủ (run_availability_test.py):**
-  * Thực hiện bài đánh giá mù (Blind Test) quy mô lớn trên **50,000 dòng luồng mạng DDoS** (trích xuất độc lập từ ngày thứ Sáu của bộ CICIDS2017).
-  * So sánh hiệu năng của cả 10 mô hình học máy có giám sát ở cả hai khía cạnh: Bảo mật (Recall) và Tính Sẵn sàng (TNR - True Negative Rate).
-  * Tính toán chỉ số chính xác thực tế khi cảnh báo xảy ra $P(\text{Attack} | \text{Alert})$ áp dụng Định lý Bayes trong môi trường thực tiễn có tỷ lệ tấn công tự nhiên rất thấp ($\theta = 0.1\%$ và $5\%$) nhằm vạch trần ngụy biện tỷ lệ cơ sở (Base Rate Fallacy).
-* **[6] Đọc Tài liệu Hướng dẫn (README.md):** Đọc nhanh nội dung hướng dẫn này ngay trên màn hình console CLI.
-* **[7] Thoát:** Đóng chương trình và tự động giải phóng môi trường ảo.
+* **[1] Cai dat thu vien va moi truong phu thuoc:** Cài đặt các thư viện trong `requirements.txt`. Sau khi cài đặt xong, hệ thống sẽ hỏi bạn có muốn tải bộ dữ liệu nén gốc (`download.rar` ~1.2 GB từ Google Drive) về thư mục `data/` không. Nếu chọn Có, hệ thống sẽ tự động tải xuống với thanh tiến trình trực tuyến.
+* **[2] Huan luyen lai he thong va so sanh cac thuat toan (train.py):**
+  * Huấn luyện 11 mô hình dựa trên toàn bộ 5 ngày dữ liệu thực tế (Monday đến Friday), bao quát mọi hành vi tấn công (DDoS, PortScan, DoS, Web Attacks, Patator, Botnet).
+  * Tránh hiện tượng quá khớp (Overfitting) bằng cách thiết lập giới hạn chiều sâu (`max_depth`) và cân bằng dữ liệu bằng kỹ thuật undersampling.
+* **[3] Danh gia cheo mo hinh Cascaded IDS tren 7 tap du lieu thuc te:** Đánh giá độ tin cậy của mô hình phân tầng bằng cách chạy thử độc lập trên 100,000 mẫu từ mỗi ngày dữ liệu thực tế khác nhau, hiển thị bảng kết quả so sánh Recall và TNR trực quan.
+* **[4] Mo phong hieu nang va danh gia mo hinh phan tang Cascaded IDS:**
+  * Chạy kiểm thử mô phỏng trên dữ liệu thực tế của ngày thứ Sáu (DDoS).
+  * Hiển thị chi tiết các chỉ số Recall, TNR, Accuracy và tự động xuất ra 3 biểu đồ đơn lẻ trong thư mục `data/external/`.
+* **[5] Khoi chay sniffer giam sat luu luong mang thoi gian thuc (live_sniffer_interactive.py):**
+  * Yêu cầu chạy Command Prompt bằng quyền **Administrator**.
+  * Bắt các gói tin thực tế đi qua card mạng, nhóm thành luồng (Flow) và tính toán 15 đặc trưng đặc trưng để dự đoán xác suất tấn công.
+  * Hiển thị thanh trượt điều chỉnh độ nhạy (ALERT_THRESHOLD) trực tiếp. Bạn có thể nhấn phím `+` hoặc `=` để **tăng độ nhạy**, nhấn phím `-` hoặc `_` để **giảm độ nhạy**, và nhấn phím `q` để thoát.
+  * Nếu phát hiện luồng nghi ngờ vượt ngưỡng cảnh báo, hệ thống sẽ in màu đỏ chi tiết về IP kẻ tấn công, IP nạn nhân, Port và xác suất độc hại.
+* **[6] Kiem thu hieu nang voi tep du lieu ngoai (evaluate.py):** Sử dụng các mô hình đã huấn luyện để dự đoán và đánh giá hiệu năng trên một tệp CSV lưu lượng mạng tùy chọn do người dùng cung cấp.
+* **[7] Chay danh gia so sanh hieu nang 10 mo hinh co ban (run_availability_test.py):** So sánh hiệu năng của 10 mô hình học máy truyền thống và áp dụng Định lý Bayes để phân tích Base Rate Fallacy.
+* **[8] Xem tai lieu huong dan su dung (README):** Đọc nhanh nội dung hướng dẫn này ngay trên màn hình console CLI.
+* **[0] Thoat chuong trinh:** Đóng chương trình và giải phóng tài nguyên hệ thống.
 
 ---
 
-## 🔬 Nguyên lý Lọc Phân Tầng Đã Được Khắc Phục (Sequential Filtering Logic)
+## 🔬 Nguyen ly Loc Phan Tang (Cascaded Filtering Architecture)
 
-Trong phiên bản v3 trước đây, đề xuất vận hành tuần tự bị lỗi logic nghiêm trọng khi đặt **Random Forest** làm bộ lọc sơ cấp vì mô hình này có Recall trên tập blind test khá thấp (63.75%), làm bỏ sót tới 36.25% các cuộc tấn công DDoS ngay từ vòng ngoài và khóa cứng trần Recall của toàn hệ thống ở mức 63.75%.
-
-Trong **phiên bản v4 mới nhất** (chi tiết trong báo cáo `BAO_CAO_IDS_AI_v4.docx`), kiến trúc phân tầng đã được sửa đổi chính xác theo nguyên lý dòng chảy dữ liệu thực tế:
+Kiến trúc phân tầng trong **phiên bản v4 mới nhất** được thiết kế để giải quyết bài toán mâu thuẫn giữa độ an toàn (Recall) và độ sẵn sàng (TNR):
 
 ```mermaid
 graph TD
-    Traffic[Lưu lượng mạng đầu vào] --> L1{Lớp 1: High-Recall Filter<br>AdaBoost / Naive Bayes}
-    L1 -- Gán nhãn Benign --> System[Cho phép đi thẳng vào hệ thống]
-    L1 -- Gán nhãn Nghi ngờ / Tấn công --> L2{Lớp 2: High-TNR Filter<br>Random Forest / Extra Trees}
-    L2 -- Gán nhãn Benign giả lập --> System
-    L2 -- Xác nhận DDoS thật --> Block[Chặn IP & Phát cảnh báo]
+    Traffic[Lưu lượng mạng đầu vào] --> L1{Lớp 1: High-Recall Filter<br>AdaBoost}
+    L1 -- Gán nhãn Benign 0 --> L3{Lớp 3: Isolation Forest<br>Phát hiện Anomaly/Zero-day}
+    L3 -- Phát hiện Dị thường 1 --> Alert2[Cảnh báo Dị thường nhãn 2]
+    L3 -- Bình thường 0 --> System[Cho phép đi vào hệ thống]
     
-    subgraph Zero-Day Detection
-        Traffic --> L3[Lớp 3: Isolation Forest<br>Chạy song song để phát hiện dị thường]
-    end
+    L1 -- Gán nhãn Nghi ngờ 1 --> L2{Lớp 2: High-TNR Filter<br>Extra Trees}
+    L2 -- Gán nhãn Benign 0 --> System
+    L2 -- Xác nhận DDoS thật 1 --> Block[Chặn IP & Cảnh báo DDoS nhãn 1]
 ```
 
-### Chi tiết các lớp phân tầng:
-1. **Lớp 1 (Màng lọc sơ cấp - Bộ lọc High-Recall):** 
-   * Sử dụng **AdaBoost** (Recall 98.35%) hoặc **Naive Bayes** (Recall 99.76%) để làm chốt chặn đầu tiên. Mục tiêu là bắt giữ gần như 100% mọi luồng tấn công, không chấp nhận bỏ sót (minimize False Negatives). 
-   * Vì các mô hình này có TNR khá thấp (có nhiều False Alarms), lưu lượng bị gán nhãn nghi ngờ sẽ chưa bị chặn ngay mà được chuyển tiếp qua Lớp 2.
-2. **Lớp 2 (Màng lọc thứ cấp - Bộ lọc High-TNR/High-Precision):**
-   * Sử dụng **Random Forest** (TNR 98.69%) hoặc **Extra Trees** (TNR 99.39%) để kiểm tra chéo các cảnh báo nghi ngờ từ Lớp 1.
-   * Lớp này đóng vai trò loại bỏ triệt để các cảnh báo giả do Lớp 1 tạo ra đối với người dùng bình thường, giữ vững tính sẵn sàng và băng thông cho máy chủ.
-3. **Lớp 3 (Phát hiện Anomaly/Zero-day):** 
-   * Chạy song song **Isolation Forest** trên các luồng thông thường để phát hiện các cuộc tấn công dị thường chưa từng có trong tập dữ liệu huấn luyện.
+### Hiệu năng ấn tượng sau khi Huấn luyện lại trên tập dữ liệu tổng hợp:
+* **Khả năng chặn DDoS (Recall):** **99.87%** (chặn thành công hầu hết mọi cuộc tấn công).
+* **Độ khả dụng cho người dùng hợp lệ (TNR):** **96.20%** (chỉ có 3.8% lưu lượng hợp lệ bị lọc nhầm qua lớp thứ cấp, đảm bảo trải nghiệm khách hàng).
+* **Độ chính xác tổng thể (Accuracy):** **98.28%**.
+* **Xác suất kết hợp của mô hình phân tầng:**
+  $$P(\text{Attack}) = \min \left( P_{\text{AdaBoost}}, P_{\text{Extra Trees}} \right)$$
 
 ---
 
 ## 📝 Thông tin Nhóm Thực hiện (Nhóm 10)
-Mọi thắc mắc và đóng góp ý kiến về hệ thống IDS AI này, vui lòng tham khảo chi tiết trong tệp báo cáo học thuật chuyên sâu [BAO_CAO_IDS_AI_v4.docx](file:///C:/Users/Hikari-Rainbow/antigravity/wise-einstein/BAO_CAO_IDS_AI_v4.docx) được đính kèm ở thư mục gốc của dự án.
+Mọi thắc mắc và đóng góp ý kiến về hệ thống IDS AI này, vui lòng tham khảo chi tiết trong tệp báo cáo học thuật chuyên sâu [BAO_CAO_IDS_AI_v4.docx](file:///D:/Nhom-10---ATTT/BAO_CAO_IDS_AI_v4.docx) được đính kèm ở thư mục gốc của dự án.
