@@ -129,3 +129,96 @@ class IDSUnsupervisedModel:
             print(f"[+] Tải mô hình Anomaly thành công từ {self.model_path}")
         else:
             raise FileNotFoundError(f"Không tìm thấy file mô hình tại {self.model_path}")
+
+
+class CascadedIDSModel:
+    """
+    Hệ thống phát hiện xâm nhập mạng phân tầng (Cascaded IDS):
+    - Lớp 1: Mô hình học có giám sát có Recall cao (mặc định: AdaBoost - 'ada')
+    - Lớp 2: Mô hình học có giám sát có TNR/Precision cao (mặc định: Extra Trees - 'et')
+    - Lớp 3: Mô hình học không giám sát phát hiện dị thường (mặc định: Isolation Forest)
+    """
+    def __init__(self, layer1_type='ada', layer2_type='et'):
+        self.layer1_type = layer1_type
+        self.layer2_type = layer2_type
+        self.layer1 = IDSSupervisedModel(model_type=layer1_type)
+        self.layer2 = IDSSupervisedModel(model_type=layer2_type)
+        self.anomaly = IDSUnsupervisedModel()
+        self.model_type = "cascaded"
+        self.has_anomaly = False
+
+    def load(self):
+        print(f"[*] Đang tải mô hình phân tầng Cascaded (L1: {self.layer1_type.upper()}, L2: {self.layer2_type.upper()})...")
+        self.layer1.load()
+        self.layer2.load()
+        try:
+            self.anomaly.load()
+            self.has_anomaly = True
+        except FileNotFoundError:
+            print("[!] Cảnh báo: Không tải được mô hình Isolation Forest (Anomaly). Bỏ qua lớp phát hiện Zero-day.")
+            self.has_anomaly = False
+
+    def predict(self, X):
+        """
+        Dự đoán nhãn theo kiến trúc phân tầng:
+        - Lớp 1 (AdaBoost) quét qua tất cả. Các luồng được gán nhãn Benign (0) được cho qua.
+        - Các luồng bị Lớp 1 gán nhãn Attack (1) sẽ chuyển qua Lớp 2 (Extra Trees) để lọc báo động giả.
+        - Nhãn cuối cùng là nhãn từ Lớp 2 đối với các luồng nghi ngờ, và 0 đối với các luồng Lớp 1 cho là an toàn.
+        """
+        import numpy as np
+        import pandas as pd
+        
+        # 1. Dự đoán Lớp 1
+        preds_l1 = self.layer1.predict(X)
+        
+        # 2. Lọc các luồng nghi ngờ (Lớp 1 dự đoán là Attack)
+        final_preds = np.copy(preds_l1)
+        
+        attack_indices = np.where(preds_l1 == 1)[0]
+        if len(attack_indices) > 0:
+            # Lấy các dòng dữ liệu nghi ngờ
+            if isinstance(X, pd.DataFrame):
+                X_suspicious = X.iloc[attack_indices]
+            else:
+                X_suspicious = X[attack_indices]
+                
+            # Dự đoán Lớp 2
+            preds_l2 = self.layer2.predict(X_suspicious)
+            
+            # Cập nhật kết quả cuối cùng: chỉ những luồng được Lớp 2 xác nhận mới là Attack
+            final_preds[attack_indices] = preds_l2
+            
+        return final_preds
+
+    def predict_detailed(self, X):
+        """
+        Dự đoán chi tiết và trả về phân loại cụ thể bao gồm:
+        - 0: Benign (Bình thường)
+        - 1: Attack (Tấn công đã được xác nhận qua Lớp 2)
+        - 2: Anomaly (Cảnh báo dị thường/Zero-day bởi Isolation Forest)
+        """
+        import numpy as np
+        
+        # Lấy dự đoán từ cascade giám sát
+        supervised_preds = self.predict(X)
+        
+        # Khởi tạo kết quả chi tiết (0 = Benign)
+        detailed_preds = np.copy(supervised_preds)
+        
+        # Nếu có mô hình anomaly, chạy song song để tìm dị thường trên các luồng được gán nhãn Benign
+        if self.has_anomaly:
+            anomaly_preds = self.anomaly.predict(X)
+            for i in range(len(supervised_preds)):
+                if supervised_preds[i] == 0 and anomaly_preds[i] == 1:
+                    # Gán nhãn dị thường (2) cho luồng Benign bị nghi ngờ
+                    detailed_preds[i] = 2
+                    
+        return detailed_preds
+
+    def predict_proba(self, X):
+        # Xác suất kết hợp phân tầng: P(Attack) = min(P(L1_Attack), P(L2_Attack))
+        import numpy as np
+        prob_l1 = self.layer1.predict_proba(X)
+        prob_l2 = self.layer2.predict_proba(X)
+        return np.minimum(prob_l1, prob_l2)
+

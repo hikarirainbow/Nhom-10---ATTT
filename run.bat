@@ -1,4 +1,6 @@
 @echo off
+:: Change directory to batch file location (handles Run as Administrator correctly)
+cd /d "%~dp0"
 :: Set UTF-8 encoding for Windows Command Prompt
 chcp 65001 > nul
 

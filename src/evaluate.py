@@ -95,14 +95,14 @@ def main():
                 # Vẽ biểu đồ ASCII phân phối dự đoán
                 attacks = int(sum(preds))
                 benign = len(preds) - attacks
-                print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title=f"📊 PHÂN BỐ LƯU LƯỢNG MẠNG DỰ ĐOÁN ({m_name.upper()})")
+                print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title=f" PHÂN BỐ LƯU LƯỢNG MẠNG DỰ ĐOÁN ({m_name.upper()})")
             else:
                 total = len(preds)
                 attacks = int(sum(preds))
                 benign = total - attacks
                 print(f"Tổng số luồng phân tích: {total}")
                 print(f"Phát hiện luồng bất thường: {attacks} ({attacks/total*100:.2f}%)")
-                print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title=f"📊 PHÂN BỐ LƯU LƯỢNG MẠNG PHÁT HIỆN ({m_name.upper()})")
+                print_ascii_bar_chart({"Benign (An toàn)": benign, "Attack (Độc hại)": attacks}, title=f" PHÂN BỐ LƯU LƯỢNG MẠNG PHÁT HIỆN ({m_name.upper()})")
                 
         except FileNotFoundError:
             print(f"[!] Không tìm thấy mô hình {m_name} đã lưu. Bỏ qua.")

@@ -188,7 +188,7 @@ class LiveIDSDetector:
             
             # Hiển thị cảnh báo
             if pred == 1:
-                print(f"\n[⚠️ ALERT] PHÁT HIỆN TẤN CÔNG (IDS Alert)!")
+                print(f"\n[ ALERT] PHÁT HIỆN TẤN CÔNG (IDS Alert)!")
                 print(f" -> Luồng: {flow.src_ip}:{flow.src_port} -> {flow.dst_ip}:{flow.dst_port} (Proto: {flow.proto})")
                 print(f" -> Xác suất độc hại: {prob*100:.2f}%")
                 print(f" -> Đặc trưng tiêu biểu: Flow Duration: {features['Flow Duration']:.2f}μs, Fwd Packets: {features['Total Fwd Packets']}, Bwd Packets: {features['Total Backward Packets']}")

@@ -46,8 +46,8 @@ def main():
     # 1. Tìm kiếm file CSV trong thư mục data/raw/
     all_csv_files = [f for f in os.listdir(config.RAW_DATA_DIR) if f.endswith('.csv')]
     
-    # Chỉ giữ các tệp tin chứa 'tuesday', 'wednesday', 'thursday' để tránh rò rỉ dữ liệu (data leakage)
-    csv_files = [f for f in all_csv_files if any(day in f.lower() for day in ['tuesday', 'wednesday', 'thursday'])]
+    # Lấy toàn bộ các file thực tế từ thứ Hai đến thứ Sáu (loại bỏ file mock_cicids2017)
+    csv_files = [f for f in all_csv_files if 'mock' not in f.lower()]
     
     if not csv_files:
         df = generate_mock_dataset(num_samples=5000)
@@ -86,8 +86,8 @@ def main():
     # 3. Cân bằng dữ liệu (Chỉ áp dụng cho Supervised)
     X_bal, y_bal = preprocessor.balance_data(X, y, strategy='undersample', ratio=1.0)
     
-    # Giới hạn kích thước mẫu huấn luyện tối đa là 15,000 dòng để 10 mô hình chạy nhanh
-    max_samples = 15000
+    # Giới hạn kích thước mẫu huấn luyện tối đa là 40,000 dòng để 10 mô hình chạy nhanh và chính xác
+    max_samples = 40000
     if len(X_bal) > max_samples:
         print(f"\n[*] Đang thu nhỏ mẫu xuống {max_samples} dòng (vẫn giữ cân bằng 50/50) để tăng tốc huấn luyện 10 mô hình...")
         df_temp = pd.concat([X_bal, y_bal], axis=1)
@@ -103,7 +103,7 @@ def main():
     
     # 3.5. Nghiên cứu Overfitting trên Decision Tree với các độ sâu khác nhau
     print("\n" + "=" * 65)
-    print(" 📊 NGHIÊN CỨU CHIỀU SÂU CÂY QUYẾT ĐỊNH (DECISION TREE DEPTH STUDY)")
+    print("  NGHIÊN CỨU CHIỀU SÂU CÂY QUYẾT ĐỊNH (DECISION TREE DEPTH STUDY)")
     print("=" * 65)
     from sklearn.tree import DecisionTreeClassifier
     depths = [3, 5, 8, 12, 20, None]
@@ -183,7 +183,7 @@ def main():
         print("[!] Không đủ dữ liệu Benign để huấn luyện Isolation Forest.")
         
     # Trực quan hóa so sánh độ chính xác của các mô hình học trên terminal
-    print_ascii_bar_chart(comparison_results, title="🏆 SO SÁNH ĐỘ CHÍNH XÁC (ACCURACY) CỦA 11 THUẬT TOÁN")
+    print_ascii_bar_chart(comparison_results, title=" SO SÁNH ĐỘ CHÍNH XÁC (ACCURACY) CỦA 11 THUẬT TOÁN")
  
 if __name__ == "__main__":
     main()

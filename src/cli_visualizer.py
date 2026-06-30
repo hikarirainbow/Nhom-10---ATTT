@@ -5,7 +5,7 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding='utf-8')
 
-def print_ascii_bar_chart(data_dict, title="📊 ĐỒ THỊ THANH"):
+def print_ascii_bar_chart(data_dict, title=" ĐỒ THỊ THANH"):
     """
     Vẽ đồ thị thanh ASCII từ dictionary dữ liệu.
     Hỗ trợ hiển thị phần trăm (nếu giá trị <= 1.0) hoặc số lượng thực tế.
@@ -37,7 +37,7 @@ def print_ascii_confusion_matrix(cm, labels=["BENIGN (An toàn)", "ATTACK (Độ
     tn, fp = cm[0][0], cm[0][1]
     fn, tp = cm[1][0], cm[1][1]
     
-    print("\n📊 MA TRẬN NHẦM LẪN (CONFUSION MATRIX)")
+    print("\n MA TRẬN NHẦM LẪN (CONFUSION MATRIX)")
     print("┌───────────────────────────┬───────────────────────────────────┐")
     print("│                           │        Dự đoán (Predicted)        │")
     print(f"│ Thực tế (Actual)          │ {labels[0]:^15} │ {labels[1]:^15} │")
