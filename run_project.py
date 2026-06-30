@@ -49,6 +49,9 @@ def main():
         
         if choice == '1':
             run_command("pip install -r requirements.txt")
+            confirm_dl = input("\nBan co muon su dung tai lieu goc cua ung dung? (y/n): ").strip().lower()
+            if confirm_dl in ['y', 'yes']:
+                run_command("python src/download_dataset.py")
         elif choice == '2':
             run_command("python src/train.py")
         elif choice == '3':
